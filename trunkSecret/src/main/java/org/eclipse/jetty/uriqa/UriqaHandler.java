@@ -15,23 +15,18 @@ public class UriqaHandler extends AbstractHandler {
 
 	private String baseURI = null;
 	//getServer().
-	
+
 	public UriqaHandler() {
-		
+
 	}
 
 	public void handle(String target, Request baseRequest,
 			HttpServletRequest request, HttpServletResponse response)
-			throws IOException, ServletException {
-//		if (baseURI == null) {
-//			baseURI = baseRequest.getScheme()+"://"+baseRequest.getServerName();
-//			UriqaRepoHandler.getDefault(baseURI);
-//		}
-//		System.out.println("now the handlers are:: ");
-//		for (Handler handler : getServer().getHandlers())
-//		{
-//			System.out.println("handler name: "+handler.toString());
-//		}
+	throws IOException, ServletException {
+		if (baseURI == null) {
+			baseURI = baseRequest.getScheme()+"://"+baseRequest.getServerName();
+			UriqaRepoHandler.getDefault(baseURI);
+		}
 		System.out.println("****************Handler***************");
 		//System.out.println("baseURI: "+baseURI);
 		//System.out.println("getLocalHost(): "+baseRequest.getConnection().getEndPoint().getLocalHost());
@@ -40,10 +35,13 @@ public class UriqaHandler extends AbstractHandler {
 		//TODO MQUERY? -> should return the query element names/id's or something. -> which the browser asks back if required.
 		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET))
 		{
-			System.out.println("MGET");
+			System.out.println("MGETting.");
 			//System.out.println("and the HttpServletRequest getMethod() gives: "+request.getMethod());
 			//response.setStatus(HttpServletResponse.SC_OK);
 			//response.setContentType(MimeTypes.TEXT_XML);
+			//response.setContentType(MimeTypes.TEXT_PLAIN);
+			//response.getOutputStream().write(new String("hello!\n").getBytes());
+			UriqaRepoHandler.getDefault().handleMget2(baseRequest, request,response.getWriter());
 			//UriqaRepoHandler.getDefault().handleMget(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo(),response.getWriter());
 			//UriqaRepoHandler.getDefault().printModeltoOutput();
 			//response should be content type of mime binary data or ascii-n3-notations.
@@ -53,45 +51,44 @@ public class UriqaHandler extends AbstractHandler {
 			//TODO Then, think of thread and implementation of runnable
 			//TODO then, think of repository
 			//TODO then, think of how they shall interact.
-			
-			((Request)request).setHandled(true);
-			baseRequest.setHandled(true);
+
+
 			//TODO Or is it baseRequest.setHandled()??
 			//TODO check after installing other Handlers also..
 		}
-		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT))
-		{
-			System.out.println("MPUT");
-			//there should be content body here
-			//TODO How should the content body structure be like? And how shall I put it as the content? Inputstream?
-			response.setStatus(HttpServletResponse.SC_OK);
-			response.setContentType(MimeTypes.TEXT_XML);
-			UriqaRepoHandler.getDefault().handleMput(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo(),request);
-			//baseRequest.getReader()
-			//request.getReader()
-			//handleMput static call
-			((Request)request).setHandled(true);
-		}
-		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE))
-		{
-			System.out.println("MDELETE");
-			response.setStatus(HttpServletResponse.SC_OK);
-			response.setContentType(MimeTypes.TEXT_XML);
-			UriqaRepoHandler.getDefault().handleMdelete(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
-			//no content body
-			//no response body
-			//just code if fail or not -> check uriqa definition pages again.
-			//handleMdelete static call
-			((Request)request).setHandled(true);
-			baseRequest.setHandled(true);
-		}
+//		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT))
+//		{
+//			System.out.println("MPUT");
+//			//there should be content body here
+//			//TODO How should the content body structure be like? And how shall I put it as the content? Inputstream?
+//			response.setStatus(HttpServletResponse.SC_OK);
+//			response.setContentType(MimeTypes.TEXT_XML);
+//			UriqaRepoHandler.getDefault().handleMput(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo(),request);
+//			//baseRequest.getReader()
+//			//request.getReader()
+//			//handleMput static call
+//			((Request)request).setHandled(true);
+//		}
+//		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE))
+//		{
+//			System.out.println("MDELETE");
+//			response.setStatus(HttpServletResponse.SC_OK);
+//			response.setContentType(MimeTypes.TEXT_XML);
+//			UriqaRepoHandler.getDefault().handleMdelete(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
+//			//no content body
+//			//no response body
+//			//just code if fail or not -> check uriqa definition pages again.
+//			//handleMdelete static call
+//			((Request)request).setHandled(true);
+//			baseRequest.setHandled(true);
+//		}
 		//System.out.println()
 		//System.out.println("VENKATESH DEBUG: target: "+target+" baseMethod: "+baseRequest.getMethod());
-        //response.setContentType("text/html");
-        //response.setStatus(HttpServletResponse.SC_OK);
-        //response.getWriter().println("<h1>Hello</h1>");
-        
-		
+		//response.setContentType("text/html");
+		//response.setStatus(HttpServletResponse.SC_OK);
+		//response.getWriter().println("<h1>Hello</h1>");
+
+
 	}
 
 }
