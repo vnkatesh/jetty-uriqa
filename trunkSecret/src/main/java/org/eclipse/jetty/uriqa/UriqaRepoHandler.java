@@ -18,9 +18,12 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 
+import com.hp.hpl.jena.graph.Graph;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Resource;
+import com.hp.hpl.jena.util.FileManager;
+import com.hp.hpl.jena.util.PrintUtil;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -29,7 +32,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	//private ModelFactory modelfactory;
 	private static Model model = null;
-	//private final String INITIAL_REPO="org/eclipse/jetty/uriqa/commonwikiparsertestrdf.rdf";
+	private final String INITIAL_REPO="org/eclipse/jetty/uriqa/smiths.rdf";
 	private String baseURI="http://localhost";
 
 	public UriqaRepoHandler(String baseURI) throws Exception {
@@ -65,43 +68,15 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	private void initializeRepo() {
 		model = ModelFactory.createDefaultModel();
-		//		try {
-		//			this.loadFromResource(INITIAL_REPO, baseURI);
-		//		} catch (FileNotFoundException e) {
-		//			e.printStackTrace();
-		//		}
+		model.add(FileManager.get().loadModel(INITIAL_REPO));
+		//this.loadFromResource(INITIAL_REPO, baseURI);
 	}
 
 	public void printModeltoOutput()
 	{
 		//TODO Language as a parameter and dynamic output.
-		model.write(System.out, UriqaConstants.Lang.TURTLE);
-	}
-
-	public void loadFromResource(String path, String baseURI) throws FileNotFoundException
-	{
-		InputStream pathStream = getClass().getClassLoader().getResourceAsStream(path);
-		if (pathStream == null)
-		{
-			throw new FileNotFoundException(path);
-		}
-		model.read(getClass().getClassLoader().getResourceAsStream(path), baseURI);
-	}
-
-	public void loadFromUrl(final String url, String baseURI)
-	{
-		String tmpDir;
-		try {
-			tmpDir = File.createTempFile("uriqa", "").getParent();
-			String[] split_url = url.split("/");
-			final File file = new File(tmpDir + "/" + split_url[split_url.length - 1]);
-			if (!file.exists()) {
-				downloadRemoteModel(url, file);
-			}
-			this.loadFromFile(file, baseURI);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+		System.out.println("******MODEL2OUTPUT");
+		model.write(System.out, UriqaConstants.Lang.RDFXML);
 	}
 
 	public void downloadRemoteModel(final String url, final File file)
@@ -128,15 +103,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	public void loadFromFile(File file, String baseURI)
-	{
-		try {
-			model.read(new FileReader(file), baseURI);
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		}
-	}
-
 	public void doStop() {
 		sharedInstance = null;
 	}
@@ -154,7 +120,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	public static void doGet(String baseURIPath, PrintWriter writer)
 	{
+		System.out.println("getting resource "+baseURIPath);
 		Resource tempResource = model.getResource(baseURIPath);
+		//TODO Ok. tempResource.getModel() gets the parent model, not a model creation of tempResource. That pisses me now.
 		tempResource.getModel().write(writer,UriqaConstants.Lang.RDFXML);
 		tempResource = null;
 	}
@@ -168,6 +136,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
+	/**
+	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
+	 */
 	public static void doDelete(String baseURIpath)
 	{
 		Resource tempResource = model.getResource(baseURIpath);
@@ -177,5 +148,55 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 		tempResource = null;
 	}
+	
+	/**
+	 * Deprecated
+	 * Use Jena's FileManager()
+	 */
+	@Deprecated
+	public void loadFromUrl(final String url, String baseURI)
+	{
+		String tmpDir;
+		try {
+			tmpDir = File.createTempFile("uriqa", "").getParent();
+			String[] split_url = url.split("/");
+			final File file = new File(tmpDir + "/" + split_url[split_url.length - 1]);
+			if (!file.exists()) {
+				downloadRemoteModel(url, file);
+			}
+			this.loadFromFile(file, baseURI);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+	}
 
+	/**
+	 * Deprecated
+	 * Use Jena's FileManager()
+	 */
+	@Deprecated
+	public void loadFromFile(File file, String baseURI)
+	{
+		try {
+			model.read(new FileReader(file), baseURI);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Deprecated
+	 * Use Jena's FileManager()
+	 */
+	@Deprecated
+	public void loadFromResource(String path, String baseURI) throws FileNotFoundException
+	{
+		InputStream pathStream = getClass().getClassLoader().getResourceAsStream(path);
+		if (pathStream == null)
+		{
+			throw new FileNotFoundException(path);
+		}
+		model.read(getClass().getClassLoader().getResourceAsStream(path), baseURI);
+	}
+	
 }

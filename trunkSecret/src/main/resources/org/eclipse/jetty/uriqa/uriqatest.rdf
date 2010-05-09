@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!DOCTYPE rdf:RDF [
+  <!ENTITY xsd 'http://www.w3.org/2001/XMLSchema#'>
+]>
+
+<rdf:RDF 
+xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
+xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" 
+xmlns:dc="http://purl.org/dc/elements/1.1/" >
+
+<rdf:Description rdf:about="http://localhost/">
+	<dc:title>RDF Vocabulary of CommonWikiParser</dc:title>
+	<dc:description>The first test of the following file.</dc:description>
+	<dc:date>Wed Jul 30 16:30:54</dc:date>
+	<rdfs:label>wikimodel common wiki parser test</rdfs:label>
+</rdf:Description>
+
+<rdfs:Class rdf:about="http://localhost/Place">
+	<rdfs:label>Place</rdfs:label>
+	<rdfs:comment>Defines the place.</rdfs:comment>
+</rdfs:Class>
+
+<rdfs:Class rdf:about="http://localhost/Rue">
+	<rdfs:label>Rue</rdfs:label>
+	<rdfs:comment>Inner Detail of Place</rdfs:comment>
+</rdfs:Class>
+
+<rdf:Property rdf:about="http://localhost/title">
+	<rdfs:domain rdf:resource="http://localhost/Document" />
+	<rdfs:label>title</rdfs:label>
+	<rdfs:comment>Title of Document</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/rdf:type">
+	<rdfs:domain rdf:resource="http://localhost/Document" />
+	<rdfs:label>rdf:type</rdfs:label>
+	<rdfs:comment>Type of Document</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/seeAlso">
+	<rdfs:domain rdf:resource="http://localhost/Document" />
+	<rdfs:label>seeAlso</rdfs:label>
+	<rdfs:comment>See Also</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/summary">
+	<rdfs:domain rdf:resource="http://localhost/Document" />
+	<rdfs:label>summary</rdfs:label>
+	<rdfs:comment>Summary of Document</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/locatedIn">
+	<rdfs:domain rdf:resource="http://localhost/Document" />
+	<rdfs:label>summary</rdfs:label>
+	<rdfs:range rdf:resource="http://localhost/Place" />
+	<rdfs:comment>Summary of Document</rdfs:comment>
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/address">
+	<rdfs:domain rdf:resource="http://localhost/Place" />
+	<rdfs:label>address</rdfs:label>
+	<rdfs:range rdf:resource="http://localhost/Rue" />
+	<rdfs:comment>Address of the Place</rdfs:comment>
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/building">
+	<rdfs:domain rdf:resource="http://localhost/Rue" />
+	<rdfs:label>building</rdfs:label>
+	<rdfs:comment>Building Number</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/street">
+	<rdfs:domain rdf:resource="http://localhost/Rue" />
+	<rdfs:label>street</rdfs:label>
+	<rdfs:comment>Street Name</rdfs:comment>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Literal" />
+</rdf:Property>
+
+<rdfs:Class rdf:about="http://localhost/Document">
+	<rdfs:label>Document</rdfs:label>
+	<rdfs:comment>The Main Document</rdfs:comment>
+</rdfs:Class>
+
+<rdfs:Class rdf:about="http://localhost/City">
+	<rdfs:label>City</rdfs:label>
+	<rdfs:comment>City</rdfs:comment>
+</rdfs:Class>
+<City rdf:ID="Paris" />
+<rdf:Property rdf:about="http://localhost/name">
+	<rdfs:domain rdf:resource="http://localhost/Place" />
+	<rdfs:label>Name</rdfs:label>
+	<rdfs:range rdf:resource="http://localhost/City" />
+	<rdfs:comment>Name of the City</rdfs:comment>
+</rdf:Property>
+
+<rdf:Property rdf:about="http://localhost/type">
+	<rdfs:domain rdf:resource="http://localhost/Place" />
+	<rdfs:label>Name</rdfs:label>
+	<rdfs:range rdf:resource="http://www.w3.org/2000/01/rdf-schema#Class" />
+	<rdfs:comment>Name of the City</rdfs:comment>
+</rdf:Property>
+
+</rdf:RDF>
