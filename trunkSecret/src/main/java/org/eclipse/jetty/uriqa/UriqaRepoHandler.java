@@ -18,12 +18,13 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 
-import com.hp.hpl.jena.graph.Graph;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
+import com.hp.hpl.jena.rdf.model.Statement;
+import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.util.FileManager;
-import com.hp.hpl.jena.util.PrintUtil;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -32,7 +33,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	//private ModelFactory modelfactory;
 	private static Model model = null;
-	private final String INITIAL_REPO="org/eclipse/jetty/uriqa/smiths.rdf";
+	private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
 	private String baseURI="http://localhost";
 
 	public UriqaRepoHandler(String baseURI) throws Exception {
@@ -69,13 +70,23 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	private void initializeRepo() {
 		model = ModelFactory.createDefaultModel();
 		model.add(FileManager.get().loadModel(INITIAL_REPO));
+		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
+		//		HashMap<String, String> map = new HashMap<String, String>();
+		//		map.put("xmlns:rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+		//		map.put("xmlns:rdfs","http://www.w3.org/2000/01/rdf-schema#");
+		//		map.put("xmlns:owl","http://www.w3.org/2002/07/owl#");
+		//		map.put("xmlns:dc","http://purl.org/dc/elements/1.1/");
+		//		map.put("xmlns:dct","http://purl.org/dc/terms/");
+		//		map.put("xmlns:xsd","http://www.w3.org/2001/XMLSchema#");
+		//		map.put("xmlns:foaf","http://xmlns.com/foaf/0.1/");
+		//		map.put("xmlns:ex","http://localhost/");
+		//		model.setNsPrefixes(map);
 		//this.loadFromResource(INITIAL_REPO, baseURI);
 	}
 
-	public void printModeltoOutput()
+	public static void printModeltoConsole()
 	{
 		//TODO Language as a parameter and dynamic output.
-		System.out.println("******MODEL2OUTPUT");
 		model.write(System.out, UriqaConstants.Lang.RDFXML);
 	}
 
@@ -121,10 +132,53 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	public static void doGet(String baseURIPath, PrintWriter writer)
 	{
 		System.out.println("getting resource "+baseURIPath);
-		Resource tempResource = model.getResource(baseURIPath);
+		//Resource tempResource = model.getResource(baseURIPath);
 		//TODO Ok. tempResource.getModel() gets the parent model, not a model creation of tempResource. That pisses me now.
-		tempResource.getModel().write(writer,UriqaConstants.Lang.RDFXML);
-		tempResource = null;
+		//tempResource.getModel().write(writer,UriqaConstants.Lang.RDFXML);
+		//TODO Custom printModel for CBD. Understand?
+		//TODO Its still printing the NodeID thing. Should I remove that?
+		getCBD(model.getResource(baseURIPath)).write(writer);
+		//tempResource = null;
+	}
+
+	private static Model getCBD(Resource r) {
+		StmtIterator iter = model.listStatements(r, null, (RDFNode) null);
+		Model tempmodel = ModelFactory.createDefaultModel();
+		while (iter.hasNext())
+		{
+			Statement stmt = iter.nextStatement();
+			tempmodel.add(stmt);
+			if (stmt.getObject().isAnon())
+			{
+				tempmodel.add(getClean((Resource) stmt.getObject()));
+			}
+			//TODO Reification stuff.
+			//TODO I'm still getting RDF:Node. Can I remove that using custom PrintModel?
+			//TODO Remove getClean if it is redundant and same as getCBD.
+			//			RSIterator iter2 =  model.listReifiedStatements(stmt);
+			//			while(iter2.hasNext())
+			//			{
+			//				Statement stmt2 = iter2.nextRS().getStatement();
+			//				System.out.println("Adding: "+stmt2.getSubject().getURI()+" -> "+ stmt2.getPredicate().getURI()+" -> "+stmt2.getObject().toString());
+			//				tempmodel.add(stmt2);
+			//			}
+		}
+		return tempmodel;
+	}
+
+	private static Model getClean(Resource r) {
+		StmtIterator iter = model.listStatements( r, null, (RDFNode) null);
+		Model cleanModel = ModelFactory.createDefaultModel();
+		while (iter.hasNext())
+		{
+			Statement stmt = iter.nextStatement();
+			cleanModel.add(stmt);
+			if (stmt.getObject().isAnon())
+			{
+				cleanModel.add(getClean((Resource) stmt.getObject()));
+			}
+		}
+		return cleanModel;
 	}
 
 	public static void doPut(String baseURIPath, HttpServletRequest request)
@@ -139,16 +193,16 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	/**
 	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
 	 */
-	public static void doDelete(String baseURIpath)
+	public static void doDelete(String baseURIPath)
 	{
-		Resource tempResource = model.getResource(baseURIpath);
-		synchronized(model)
-		{
-			model.remove(tempResource.getModel());
-		}
-		tempResource = null;
+		//		TODO synchronized(model)
+		System.out.println("deleting resource"+baseURIPath);
+		model.remove(getCBD(model.getResource(baseURIPath)));
+		//TODO the rdf:NodeID's still exist. Is that correct?
+		//TODO the reification statments, should that come in printModeltoConsole()?
+		printModeltoConsole();
 	}
-	
+
 	/**
 	 * Deprecated
 	 * Use Jena's FileManager()
@@ -198,5 +252,5 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 		model.read(getClass().getClassLoader().getResourceAsStream(path), baseURI);
 	}
-	
+
 }

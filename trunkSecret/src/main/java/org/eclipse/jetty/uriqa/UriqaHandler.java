@@ -36,7 +36,7 @@ public class UriqaHandler extends AbstractHandler {
 			response.setStatus(HttpServletResponse.SC_OK);
 			response.setContentType(MimeTypes.TEXT_XML);
 			UriqaRepoHandler.getDefault().handleRequest(request,response.getWriter(), baseRequest.getMethod());
-			//UriqaRepoHandler.getDefault().printModeltoOutput();
+			//UriqaRepoHandler.getDefault().printModeltoConsole();
 			//response should be content type of mime binary data or ascii-n3-notations.
 			//TODO Repository in a filesystem??
 			//TODO Or is it baseRequest.setHandled()??
