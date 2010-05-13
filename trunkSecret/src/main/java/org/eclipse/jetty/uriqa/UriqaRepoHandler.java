@@ -24,7 +24,7 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
-import com.hp.hpl.jena.util.FileManager;
+import com.hp.hpl.jena.shared.JenaException;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -69,7 +69,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	private void initializeRepo() {
 		model = ModelFactory.createDefaultModel();
-		model.add(FileManager.get().loadModel(INITIAL_REPO));
+		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
 		//		HashMap<String, String> map = new HashMap<String, String>();
 		//		map.put("xmlns:rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -124,7 +124,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		if (method.equals(UriqaConstants.Methods.MGET))
 			doGet(baseURIpath, writer);
 		if (method.equals(UriqaConstants.Methods.MPUT))
-			doPut(baseURIpath, request);
+		{
+			try {
+				doPut(baseURI, request);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		if (method.equals(UriqaConstants.Methods.MDELETE))
 			doDelete(baseURIpath);
 	}
@@ -153,6 +159,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				tempmodel.add(getClean((Resource) stmt.getObject()));
 			}
 			//TODO Reification stuff.
+			//Maybe this link can help: http://jena.sourceforge.net/how-to/reification.html
 			//TODO I'm still getting RDF:Node. Can I remove that using custom PrintModel?
 			//TODO Remove getClean if it is redundant and same as getCBD.
 			//			RSIterator iter2 =  model.listReifiedStatements(stmt);
@@ -181,12 +188,15 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		return cleanModel;
 	}
 
-	public static void doPut(String baseURIPath, HttpServletRequest request)
+	public static void doPut(String baseURI, HttpServletRequest request) throws IOException
 	{
+		System.out.println("putting resource.");
 		try {
-			model.read(request.getInputStream(), baseURIPath );
+			model.read(request.getInputStream(), baseURI );
 		} catch (IOException e) {
 			e.printStackTrace();
+		} catch (JenaException e) {
+			//TODO Premature end of file: response code something else.
 		}
 	}
 
@@ -200,7 +210,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.remove(getCBD(model.getResource(baseURIPath)));
 		//TODO the rdf:NodeID's still exist. Is that correct?
 		//TODO the reification statments, should that come in printModeltoConsole()?
-		printModeltoConsole();
 	}
 
 	/**

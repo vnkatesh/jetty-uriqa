@@ -1,5 +1,4 @@
 <?xml version="1.0"?>
-
 <rdf:RDF
    xmlns:rdf  ="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:rdfs ="http://www.w3.org/2000/01/rdf-schema#"
@@ -9,7 +8,6 @@
    xmlns:xsd  ="http://www.w3.org/2001/XMLSchema#"
    xmlns:foaf ="http://xmlns.com/foaf/0.1/"
    xmlns:ex   ="http://localhost/">
-
    <rdf:Description rdf:about="http://localhost/aReallyGreatBook">
       <dc:title>A Really Great Book</dc:title>
       <dc:publisher>Examples-R-Us</dc:publisher>
@@ -40,21 +38,18 @@
       <dct:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2004-01-19</dct:issued>
       <rdfs:seeAlso rdf:resource="http://localhost/anotherGreatBook"/>
    </rdf:Description>
-
    <rdf:Statement>
       <rdf:subject rdf:resource="http://localhost/aReallyGreatBook"/>
       <rdf:predicate rdf:resource="http://purl.org/dc/elements/1.1/format"/> 
       <rdf:object>application/pdf</rdf:object>
       <rdfs:isDefinedBy rdf:resource="http://localhost/book-formats.rdf"/>
    </rdf:Statement>
-
    <rdf:Statement>
       <rdf:subject rdf:resource="http://xmlns.com/foaf/0.1/Image"/>
       <rdf:predicate rdf:resource="http://purl.org/dc/elements/1.1/format"/> 
       <rdf:object>image/jpeg</rdf:object>
       <rdfs:isDefinedBy rdf:resource="http://localhost/image-formats.rdf"/>
    </rdf:Statement>
-
    <rdf:Description rdf:about="http://localhost/anotherGreatBook">
       <dc:title>Another Great Book</dc:title>
       <dc:publisher>Examples-R-Us</dc:publisher>
@@ -65,14 +60,11 @@
       <dct:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2004-05-03</dct:issued>
       <rdfs:seeAlso rdf:resource="http://localhost/aReallyGreatBook"/>
    </rdf:Description>
-
    <rdf:Description rdf:about="http://localhost/aBookCritic">
       <ex:likes rdf:resource="http://localhost/aReallyGreatBook"/>
       <ex:dislikes rdf:resource="http://localhost/anotherGreatBook"/>
    </rdf:Description>
-
    <rdf:Property rdf:about="http://xmlns.com/foaf/0.1/mbox">
       <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
    </rdf:Property>
-
 </rdf:RDF>
