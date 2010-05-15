@@ -20,7 +20,8 @@ public class UriqaConstants {
 
 		public final static String MGET= "MGET",
 		MPUT= "MPUT",
-		MDELETE= "MDELETE";
+		MDELETE= "MDELETE",
+		MQUERY= "MQUERY";
 
 		//	    public final static int MGET_ORDINAL= 1,
 		//	        MPUT_ORDINAL= 2,

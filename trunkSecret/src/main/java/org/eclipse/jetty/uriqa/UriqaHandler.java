@@ -31,11 +31,11 @@ public class UriqaHandler extends AbstractHandler {
 		//TODO what about MSEARCH or something? inferencing or querying model??
 		//TODO MQUERY? -> should return the query element names/id's or something. -> which the browser asks back if required.
 		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
-				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE))
+				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY))
 		{
 			response.setStatus(HttpServletResponse.SC_OK);
 			response.setContentType(MimeTypes.TEXT_XML);
-			UriqaRepoHandler.getDefault().handleRequest(request,response.getWriter(), baseRequest.getMethod());
+			UriqaRepoHandler.getDefault().handleRequest(request,response, baseRequest.getMethod());
 			//UriqaRepoHandler.getDefault().printModeltoConsole();
 			//response should be content type of mime binary data or ascii-n3-notations.
 			//TODO Repository in a filesystem??

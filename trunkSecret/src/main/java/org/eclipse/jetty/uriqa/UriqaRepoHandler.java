@@ -2,6 +2,7 @@ package org.eclipse.jetty.uriqa;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -14,10 +15,18 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 
+import com.hp.hpl.jena.query.Query;
+import com.hp.hpl.jena.query.QueryExecution;
+import com.hp.hpl.jena.query.QueryExecutionFactory;
+import com.hp.hpl.jena.query.QueryFactory;
+import com.hp.hpl.jena.query.ResultSet;
+import com.hp.hpl.jena.query.ResultSetFormatter;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.RDFNode;
@@ -25,6 +34,7 @@ import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.shared.JenaException;
+import com.hp.hpl.jena.shared.Lock;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -68,7 +78,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	}
 
 	private void initializeRepo() {
-		model = ModelFactory.createDefaultModel();
+		model.enterCriticalSection(Lock.WRITE);
+		try {
+			model = ModelFactory.createDefaultModel();
+		} finally {
+			model.leaveCriticalSection();
+		}
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
 		//		HashMap<String, String> map = new HashMap<String, String>();
@@ -87,7 +102,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	public static void printModeltoConsole()
 	{
 		//TODO Language as a parameter and dynamic output.
-		model.write(System.out, UriqaConstants.Lang.RDFXML);
+		model.enterCriticalSection(Lock.READ);
+		try {
+			model.write(System.out, UriqaConstants.Lang.RDFXML);
+		} finally {
+			model.leaveCriticalSection();
+		}
+
 	}
 
 	public void downloadRemoteModel(final String url, final File file)
@@ -118,11 +139,17 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		sharedInstance = null;
 	}
 
-	public void handleRequest(HttpServletRequest request, PrintWriter writer, String method) {
+	public void handleRequest(HttpServletRequest request, HttpServletResponse response, String method) {
 		//TODO Better response code if the resource was not actually found.
 		String baseURIpath = baseURI+(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
 		if (method.equals(UriqaConstants.Methods.MGET))
-			doGet(baseURIpath, writer);
+		{
+			try {
+				doGet(baseURIpath, response.getWriter());
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
 		if (method.equals(UriqaConstants.Methods.MPUT))
 		{
 			try {
@@ -133,9 +160,45 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 		if (method.equals(UriqaConstants.Methods.MDELETE))
 			doDelete(baseURIpath);
+		if (method.equals(UriqaConstants.Methods.MQUERY))
+		{
+			try {
+				doQuery(request, response.getOutputStream());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
-	public static void doGet(String baseURIPath, PrintWriter writer)
+	private static void doQuery(HttpServletRequest request, ServletOutputStream output) throws IOException {
+		BufferedReader reader = request.getReader();
+		int count = 0;
+		String line;
+		String queryString = new String();
+
+		while ((line = reader.readLine()) != null)
+		{
+			queryString +=line;
+			queryString +="\n";
+			count += line.length();
+		}
+
+		reader.close();
+		if (reader.read() >= 0)
+			throw new IllegalStateException("Not closed");
+
+		Query query = QueryFactory.create(queryString) ;
+		// TODO Only select query, therefore - No Update queries and corresponding lock?
+		model.enterCriticalSection(Lock.READ) ;
+		try {
+			QueryExecution qexec = QueryExecutionFactory.create(query, model) ;
+			ResultSet results = qexec.execSelect();
+			ResultSetFormatter.out(output, results, query);
+			qexec.close();
+		} finally { model.leaveCriticalSection() ; }		
+	}
+
+	private static void doGet(String baseURIPath, PrintWriter writer)
 	{
 		System.out.println("getting resource "+baseURIPath);
 		//Resource tempResource = model.getResource(baseURIPath);
@@ -143,71 +206,94 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//tempResource.getModel().write(writer,UriqaConstants.Lang.RDFXML);
 		//TODO Custom printModel for CBD. Understand?
 		//TODO Its still printing the NodeID thing. Should I remove that?
-		getCBD(model.getResource(baseURIPath)).write(writer);
+		model.enterCriticalSection(Lock.READ);
+		try {
+			getCBD(model.getResource(baseURIPath)).write(writer, UriqaConstants.Lang.RDFXML);
+		} finally {
+			model.leaveCriticalSection();
+		}
 		//tempResource = null;
 	}
 
 	private static Model getCBD(Resource r) {
-		StmtIterator iter = model.listStatements(r, null, (RDFNode) null);
-		Model tempmodel = ModelFactory.createDefaultModel();
-		while (iter.hasNext())
-		{
-			Statement stmt = iter.nextStatement();
-			tempmodel.add(stmt);
-			if (stmt.getObject().isAnon())
+		model.enterCriticalSection(Lock.READ);
+		try {
+			StmtIterator iter = model.listStatements(r, null, (RDFNode) null);
+			Model tempmodel = ModelFactory.createDefaultModel();
+			while (iter.hasNext())
 			{
-				tempmodel.add(getClean((Resource) stmt.getObject()));
+				Statement stmt = iter.nextStatement();
+				tempmodel.add(stmt);
+				if (stmt.getObject().isAnon())
+				{
+					tempmodel.add(getClean((Resource) stmt.getObject()));
+				}
+				//TODO Reification stuff.
+				//Maybe this link can help: http://jena.sourceforge.net/how-to/reification.html
+				//TODO I'm still getting RDF:Node. Can I remove that using custom PrintModel?
+				//TODO Remove getClean if it is redundant and same as getCBD.
+				//			RSIterator iter2 =  model.listReifiedStatements(stmt);
+				//			while(iter2.hasNext())
+				//			{
+				//				Statement stmt2 = iter2.nextRS().getStatement();
+				//				System.out.println("Adding: "+stmt2.getSubject().getURI()+" -> "+ stmt2.getPredicate().getURI()+" -> "+stmt2.getObject().toString());
+				//				tempmodel.add(stmt2);
+				//			}
 			}
-			//TODO Reification stuff.
-			//Maybe this link can help: http://jena.sourceforge.net/how-to/reification.html
-			//TODO I'm still getting RDF:Node. Can I remove that using custom PrintModel?
-			//TODO Remove getClean if it is redundant and same as getCBD.
-			//			RSIterator iter2 =  model.listReifiedStatements(stmt);
-			//			while(iter2.hasNext())
-			//			{
-			//				Statement stmt2 = iter2.nextRS().getStatement();
-			//				System.out.println("Adding: "+stmt2.getSubject().getURI()+" -> "+ stmt2.getPredicate().getURI()+" -> "+stmt2.getObject().toString());
-			//				tempmodel.add(stmt2);
-			//			}
+			return tempmodel;
+		} finally {
+			model.leaveCriticalSection();
 		}
-		return tempmodel;
 	}
 
 	private static Model getClean(Resource r) {
-		StmtIterator iter = model.listStatements( r, null, (RDFNode) null);
-		Model cleanModel = ModelFactory.createDefaultModel();
-		while (iter.hasNext())
-		{
-			Statement stmt = iter.nextStatement();
-			cleanModel.add(stmt);
-			if (stmt.getObject().isAnon())
+		model.enterCriticalSection(Lock.READ);
+		try {
+			StmtIterator iter = model.listStatements( r, null, (RDFNode) null);
+			Model cleanModel = ModelFactory.createDefaultModel();
+			while (iter.hasNext())
 			{
-				cleanModel.add(getClean((Resource) stmt.getObject()));
+				Statement stmt = iter.nextStatement();
+				cleanModel.add(stmt);
+				if (stmt.getObject().isAnon())
+				{
+					cleanModel.add(getClean((Resource) stmt.getObject()));
+				}
 			}
+			return cleanModel;
+		} finally {
+			model.leaveCriticalSection();
 		}
-		return cleanModel;
 	}
 
-	public static void doPut(String baseURI, HttpServletRequest request) throws IOException
+	private static void doPut(String baseURI, HttpServletRequest request) throws IOException
 	{
 		System.out.println("putting resource.");
+		model.enterCriticalSection(Lock.WRITE);
 		try {
 			model.read(request.getInputStream(), baseURI );
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (JenaException e) {
 			//TODO Premature end of file: response code something else.
+		} finally {
+			model.leaveCriticalSection();
 		}
 	}
 
 	/**
 	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
 	 */
-	public static void doDelete(String baseURIPath)
+	private static void doDelete(String baseURIPath)
 	{
 		//		TODO synchronized(model)
 		System.out.println("deleting resource"+baseURIPath);
-		model.remove(getCBD(model.getResource(baseURIPath)));
+		model.enterCriticalSection(Lock.WRITE);
+		try {
+			model.remove(getCBD(model.getResource(baseURIPath)));
+		} finally {
+			model.leaveCriticalSection();
+		}
 		//TODO the rdf:NodeID's still exist. Is that correct?
 		//TODO the reification statments, should that come in printModeltoConsole()?
 	}
@@ -240,10 +326,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	@Deprecated
 	public void loadFromFile(File file, String baseURI)
 	{
+		model.enterCriticalSection(Lock.WRITE);
 		try {
 			model.read(new FileReader(file), baseURI);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
+		} finally {
+			model.leaveCriticalSection();
 		}
 	}
 
@@ -259,7 +348,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		{
 			throw new FileNotFoundException(path);
 		}
-		model.read(getClass().getClassLoader().getResourceAsStream(path), baseURI);
+		model.enterCriticalSection(Lock.WRITE);
+		try {
+			model.read(getClass().getClassLoader().getResourceAsStream(path), baseURI);
+		} finally {
+			model.leaveCriticalSection();
+		}
 	}
 
 }
