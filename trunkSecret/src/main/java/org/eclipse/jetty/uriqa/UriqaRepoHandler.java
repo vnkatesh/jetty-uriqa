@@ -35,9 +35,11 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
+import com.hp.hpl.jena.tdb.TDBFactory;
 
-@SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
+
+	private static final long serialVersionUID = -4440646463440774989L;
 
 	private static UriqaRepoHandler sharedInstance = null;
 
@@ -45,6 +47,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	private static Model model = null;
 	private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
 	private String baseURI="http://localhost";
+	private String DBdirectory;
 
 	public UriqaRepoHandler(String baseURI) throws Exception {
 		if(baseURI != null)
@@ -73,16 +76,33 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	@Override
 	public void doStart() {
 		//getDefault();
-		this.initializeRepo();
+		//In-Memory Model
+		//this.initializeRepo();
+		//TDB Model
+		this.initializeRepo(((Long) serialVersionUID).hashCode());
 		//initialize repositories.
 	}
 
-	private void initializeRepo() {
-		model.enterCriticalSection(Lock.WRITE);
-		try {
-			model = ModelFactory.createDefaultModel();
-		} finally {
-			model.leaveCriticalSection();
+	private void initializeRepo(int hash) {
+		if (hash == 0)
+		{
+			if (model !=null)
+			{
+				model.enterCriticalSection(Lock.WRITE);
+				try {
+					model = ModelFactory.createDefaultModel();
+				} finally {
+					model.leaveCriticalSection();
+				}
+			}
+			else
+				model = ModelFactory.createDefaultModel();
+		}
+		else
+		{
+			DBdirectory = "/home/venkatesh/UriqaDB_"+Integer.toString(hash);
+			//TODO Does this return existing model from directory? Test that!
+			model = TDBFactory.createModel(DBdirectory);
 		}
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
@@ -354,6 +374,16 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		} finally {
 			model.leaveCriticalSection();
 		}
+	}
+	
+	/**
+	 * 
+	 * Use TDB.
+	 */
+	@Deprecated
+	private void initializeRepo()
+	{
+		this.initializeRepo(0);
 	}
 
 }
