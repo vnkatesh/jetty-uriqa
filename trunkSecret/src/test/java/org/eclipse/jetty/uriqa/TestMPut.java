@@ -82,7 +82,6 @@ public class TestMPut {
 			"      <rdf:type rdf:resource=\"http://www.w3.org/2002/07/owl#InverseFunctionalProperty\"/>\r\n" +
 			"   </rdf:Property>\r\n" +
 			"</rdf:RDF>\r\n";
-			System.out.println("Length: "+xmldata.length());
 			String hostname = "localhost";
 			int port = 8080;
 			InetAddress  addr = InetAddress.getByName(hostname);

@@ -35,6 +35,7 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
+import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
 
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -212,8 +213,29 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.enterCriticalSection(Lock.READ) ;
 		try {
 			QueryExecution qexec = QueryExecutionFactory.create(query, model) ;
-			ResultSet results = qexec.execSelect();
-			ResultSetFormatter.out(output, results, query);
+			if (query.isSelectType())
+			{
+				ResultSet results = qexec.execSelect();
+				ResultSetFormatter.outputAsXML(output, results);
+				//TODO format parameter
+			}
+			if (query.isAskType())
+			{
+				Boolean answer = qexec.execAsk();
+				ResultSetFormatter.outputAsXML(output, answer);
+			}
+			if (query.isConstructType())
+			{
+				Model tempmodel = qexec.execConstruct();
+				//TODO CBD write
+				tempmodel.write(output);
+			}
+			if (query.isDescribeType())
+			{
+				Model tempmodel = qexec.execDescribe();
+				//TODO CBD write
+				tempmodel.write(output);
+			}
 			qexec.close();
 		} finally { model.leaveCriticalSection() ; }		
 	}
@@ -235,6 +257,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//tempResource = null;
 	}
 
+	//TODO Make getCBD more generalized. i.e for any model, so that I can use it for tempmodel.
 	private static Model getCBD(Resource r) {
 		model.enterCriticalSection(Lock.READ);
 		try {
@@ -384,6 +407,16 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	private void initializeRepo()
 	{
 		this.initializeRepo(0);
+	}
+	
+	protected void finalize() throws Throwable {
+	    try {
+	    	TDB.sync(model);
+	    	model.close();
+	    	System.gc();
+	    } finally {
+	        super.finalize();
+	    }
 	}
 
 }
