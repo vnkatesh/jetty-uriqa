@@ -1,6 +1,7 @@
 package org.eclipse.jetty.uriqa;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -13,9 +14,13 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 public class UriqaHandler extends AbstractHandler {
 
 	private String baseURI = null;
+	HashMap<String, String> paramMap = new HashMap<String, String>(3);
 	//getServer().
 
 	public UriqaHandler() {
+		paramMap.put(UriqaConstants.Parameters.FORMAT, UriqaConstants.Lang.RDFXML);
+		paramMap.put(UriqaConstants.Parameters.NAMING, UriqaConstants.Values.LABEL);
+		paramMap.put(UriqaConstants.Parameters.INFERENCE, UriqaConstants.Values.EXC);
 	}
 
 	public void handle(String target, Request baseRequest,
@@ -27,28 +32,31 @@ public class UriqaHandler extends AbstractHandler {
 		}
 		System.out.println("****************Handler***************");
 		//System.out.println("getLocalHost(): "+baseRequest.getConnection().getEndPoint().getLocalHost());
-		//TODO use UriqaMethods ENUM Matching.
-		//TODO what about MSEARCH or something? inferencing or querying model??
-		//TODO MQUERY? -> should return the query element names/id's or something. -> which the browser asks back if required.
+		//TODO use UriqaMethods ENUM Matching. Better DS required probably.
 		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
 				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY))
 		{
 			response.setStatus(HttpServletResponse.SC_OK);
 			response.setContentType(MimeTypes.TEXT_XML);
-			UriqaRepoHandler.getDefault().handleRequest(request,response, baseRequest.getMethod());
+			if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
+				paramMap.remove(UriqaConstants.Parameters.FORMAT);
+				paramMap.put(UriqaConstants.Parameters.FORMAT, request.getHeader(UriqaConstants.Parameters.FORMAT));
+			}
+			if (request.getHeader(UriqaConstants.Parameters.NAMING) != null) {
+				paramMap.remove(UriqaConstants.Parameters.NAMING);
+				paramMap.put(UriqaConstants.Parameters.NAMING, request.getHeader(UriqaConstants.Parameters.NAMING));
+			}
+			if (request.getHeader(UriqaConstants.Parameters.INFERENCE) != null) {
+				paramMap.remove(UriqaConstants.Parameters.INFERENCE);
+				paramMap.put(UriqaConstants.Parameters.INFERENCE, request.getHeader(UriqaConstants.Parameters.INFERENCE));
+			}
+			UriqaRepoHandler.getDefault().handleRequest(request,response, baseRequest.getMethod(), paramMap);
 			//UriqaRepoHandler.getDefault().printModeltoConsole();
-			//response should be content type of mime binary data or ascii-n3-notations.
-			//TODO Repository in a filesystem??
+			//TODO: Content-type and content-length.
 			//TODO Or is it baseRequest.setHandled()??
 			((Request)request).setHandled(true);
 			baseRequest.setHandled(true);
 			//TODO check after installing other Handlers also..
 		}
-		//TODO How should the content body structure be like? And how shall I put it as the content? Inputstream?
-		//baseRequest.getReader()
-		//request.getReader()
-		//just code if fail or not -> check uriqa definition pages again.
-
 	}
-
 }

@@ -12,28 +12,28 @@ public class UriqaConstants {
 		N3="N3";
 	}
 
-	public class Methods
-	{
-		//	    public enum CACHE {
-		//	    	MGET,MPUT,MDELETE
-		//		}
-
+	public class Methods {
 		public final static String MGET= "MGET",
 		MPUT= "MPUT",
 		MDELETE= "MDELETE",
 		MQUERY= "MQUERY";
-
-		//	    public final static int MGET_ORDINAL= 1,
-		//	        MPUT_ORDINAL= 2,
-		//	        MDELETE_ORDINAL= 3;
-
-		//	    public final static BufferCache CACHE= new BufferCache();
-		//
-		//	    public final static Buffer 
-		//	        MGET_BUFFER= CACHE.add(MGET, MGET_ORDINAL),
-		//	        MPUT_BUFFER= CACHE.add(MPUT, MPUT_ORDINAL),
-		//	        MDELETE_BUFFER= CACHE.add(MDELETE, MDELETE_ORDINAL);
-
 	}
 
+	public class Parameters {
+		public final static String FORMAT="format",
+		NAMING= "naming",
+		INFERENCE= "inference";
+	}
+
+	public class Values {
+		public final static String RDFXML="application/rdf+xml",
+		HTML="text/html",
+		JSON="text/json",
+		FACET="application/rdf-facets",
+		LABEL="label",
+		URI="uri",
+		INC="include",
+		EXC="exclude";
+	}
+	
 }

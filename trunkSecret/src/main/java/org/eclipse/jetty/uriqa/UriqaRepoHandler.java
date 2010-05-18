@@ -14,6 +14,7 @@ import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -38,15 +39,13 @@ import com.hp.hpl.jena.shared.Lock;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
 
+@SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
-
-	private static final long serialVersionUID = -4440646463440774989L;
 
 	private static UriqaRepoHandler sharedInstance = null;
 
-	//private ModelFactory modelfactory;
 	private static Model model = null;
-	private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
+	//private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
 	private String baseURI="http://localhost";
 	private String DBdirectory;
 
@@ -76,12 +75,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	@Override
 	public void doStart() {
-		//getDefault();
 		//In-Memory Model
 		//this.initializeRepo();
 		//TDB Model
-		this.initializeRepo(((Long) serialVersionUID).hashCode());
-		//initialize repositories.
+		this.initializeRepo(System.getProperty("user.dir").toString().hashCode());
 	}
 
 	private void initializeRepo(int hash) {
@@ -102,7 +99,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		else
 		{
 			DBdirectory = "/home/venkatesh/UriqaDB_"+Integer.toString(hash);
-			//TODO Does this return existing model from directory? Test that!
 			model = TDBFactory.createModel(DBdirectory);
 		}
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
@@ -160,13 +156,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		sharedInstance = null;
 	}
 
-	public void handleRequest(HttpServletRequest request, HttpServletResponse response, String method) {
+	public void handleRequest(HttpServletRequest request, HttpServletResponse response, String method, HashMap<String, String> paramMap) {
 		//TODO Better response code if the resource was not actually found.
 		String baseURIpath = baseURI+(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
 		if (method.equals(UriqaConstants.Methods.MGET))
 		{
 			try {
-				doGet(baseURIpath, response.getWriter());
+				doGet(baseURIpath, response.getWriter(), paramMap);
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
@@ -184,14 +180,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		if (method.equals(UriqaConstants.Methods.MQUERY))
 		{
 			try {
-				doQuery(request, response.getOutputStream());
+				doQuery(request, response.getOutputStream(), paramMap);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
-	private static void doQuery(HttpServletRequest request, ServletOutputStream output) throws IOException {
+	private static void doQuery(HttpServletRequest request, ServletOutputStream output, HashMap<String, String> paramMap) throws IOException {
 		BufferedReader reader = request.getReader();
 		int count = 0;
 		String line;
@@ -216,13 +212,18 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			if (query.isSelectType())
 			{
 				ResultSet results = qexec.execSelect();
-				ResultSetFormatter.outputAsXML(output, results);
-				//TODO format parameter
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML))
+					ResultSetFormatter.outputAsXML(output, results);
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
+					ResultSetFormatter.outputAsJSON(output, results);
 			}
 			if (query.isAskType())
 			{
 				Boolean answer = qexec.execAsk();
-				ResultSetFormatter.outputAsXML(output, answer);
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML))
+					ResultSetFormatter.outputAsXML(output, answer);
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
+					ResultSetFormatter.outputAsJSON(output, answer);
 			}
 			if (query.isConstructType())
 			{
@@ -240,21 +241,17 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		} finally { model.leaveCriticalSection() ; }		
 	}
 
-	private static void doGet(String baseURIPath, PrintWriter writer)
+	private static void doGet(String baseURIPath, PrintWriter writer, HashMap<String, String> paramMap)
 	{
 		System.out.println("getting resource "+baseURIPath);
-		//Resource tempResource = model.getResource(baseURIPath);
-		//TODO Ok. tempResource.getModel() gets the parent model, not a model creation of tempResource. That pisses me now.
-		//tempResource.getModel().write(writer,UriqaConstants.Lang.RDFXML);
-		//TODO Custom printModel for CBD. Understand?
+		//TODO Custom printModel for CBD. Understand? Check for Anonnodes and print CBD of them inside itself. 
 		//TODO Its still printing the NodeID thing. Should I remove that?
 		model.enterCriticalSection(Lock.READ);
 		try {
-			getCBD(model.getResource(baseURIPath)).write(writer, UriqaConstants.Lang.RDFXML);
+			getCBD(model.getResource(baseURIPath)).write(writer, paramMap.get(UriqaConstants.Parameters.FORMAT));
 		} finally {
 			model.leaveCriticalSection();
 		}
-		//tempResource = null;
 	}
 
 	//TODO Make getCBD more generalized. i.e for any model, so that I can use it for tempmodel.
@@ -329,7 +326,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	 */
 	private static void doDelete(String baseURIPath)
 	{
-		//		TODO synchronized(model)
 		System.out.println("deleting resource"+baseURIPath);
 		model.enterCriticalSection(Lock.WRITE);
 		try {
@@ -418,5 +414,4 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	        super.finalize();
 	    }
 	}
-
 }
