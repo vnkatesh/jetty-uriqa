@@ -3,6 +3,7 @@ package org.eclipse.jetty.uriqa;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -19,8 +21,19 @@ import java.util.HashMap;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 import com.hp.hpl.jena.query.Query;
 import com.hp.hpl.jena.query.QueryExecution;
@@ -162,9 +175,15 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		if (method.equals(UriqaConstants.Methods.MGET))
 		{
 			try {
-				doGet(baseURIpath, response.getWriter(), paramMap);
+				doGet(baseURIpath, response, paramMap);
 			} catch (IOException e1) {
 				e1.printStackTrace();
+			} catch (TransformerException e) {
+				e.printStackTrace();
+			} catch (SAXException e) {
+				e.printStackTrace();
+			} catch (ParserConfigurationException e) {
+				e.printStackTrace();
 			}
 		}
 		if (method.equals(UriqaConstants.Methods.MPUT))
@@ -187,7 +206,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	private static void doQuery(HttpServletRequest request, ServletOutputStream output, HashMap<String, String> paramMap) throws IOException {
+	private void doQuery(HttpServletRequest request, ServletOutputStream output, HashMap<String, String> paramMap) throws IOException {
 		BufferedReader reader = request.getReader();
 		int count = 0;
 		String line;
@@ -241,17 +260,52 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		} finally { model.leaveCriticalSection() ; }		
 	}
 
-	private static void doGet(String baseURIPath, PrintWriter writer, HashMap<String, String> paramMap)
+	private void doGet(String baseURIPath, HttpServletResponse response, HashMap<String, String> paramMap) throws IOException, TransformerException, SAXException, ParserConfigurationException
 	{
 		System.out.println("getting resource "+baseURIPath);
 		//TODO Custom printModel for CBD. Understand? Check for Anonnodes and print CBD of them inside itself. 
 		//TODO Its still printing the NodeID thing. Should I remove that?
 		model.enterCriticalSection(Lock.READ);
 		try {
-			getCBD(model.getResource(baseURIPath)).write(writer, paramMap.get(UriqaConstants.Parameters.FORMAT));
+			if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.HTML))
+			{
+				rdf2html(getCBD(model.getResource(baseURIPath)), response);
+			}
+			else
+			{
+				getCBD(model.getResource(baseURIPath)).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+			}
 		} finally {
 			model.leaveCriticalSection();
 		}
+	}
+
+	private void rdf2html(Model data, HttpServletResponse response) throws IOException, TransformerException, SAXException, ParserConfigurationException 
+	{
+		response.setCharacterEncoding("UTF-8");
+		response.setContentType("text/html");
+
+		PrintWriter out = new PrintWriter(response.getOutputStream());           
+		InputSource iSource;
+		ByteArrayOutputStream o = new ByteArrayOutputStream();
+		data.write(o, "RDF/XML-ABBREV");
+		o.flush();
+		String rdfxml = o.toString("UTF8");
+		iSource = new InputSource(new StringReader(rdfxml));
+
+		SAXParserFactory pFactory = SAXParserFactory.newInstance();
+		pFactory.setNamespaceAware(true);
+		pFactory.setValidating(false);
+		XMLReader xmlReader = pFactory.newSAXParser().getXMLReader();
+
+		TransformerFactory tFactory = TransformerFactory.newInstance();
+		Transformer transformer = tFactory.newTransformer();
+		transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+		transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "-//W3C//DTD XHTML+RDFa 1.0//EN");
+		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd");
+		transformer.setOutputProperty(OutputKeys.ENCODING, "UTF8");
+		transformer.transform(new SAXSource(xmlReader, iSource), new StreamResult(out));
+		out.close();
 	}
 
 	//TODO Make getCBD more generalized. i.e for any model, so that I can use it for tempmodel.
@@ -306,7 +360,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	private static void doPut(String baseURI, HttpServletRequest request) throws IOException
+	private void doPut(String baseURI, HttpServletRequest request) throws IOException
 	{
 		System.out.println("putting resource.");
 		model.enterCriticalSection(Lock.WRITE);
@@ -324,7 +378,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	/**
 	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
 	 */
-	private static void doDelete(String baseURIPath)
+	private void doDelete(String baseURIPath)
 	{
 		System.out.println("deleting resource"+baseURIPath);
 		model.enterCriticalSection(Lock.WRITE);
@@ -394,7 +448,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			model.leaveCriticalSection();
 		}
 	}
-	
+
 	/**
 	 * 
 	 * Use TDB.
@@ -404,14 +458,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	{
 		this.initializeRepo(0);
 	}
-	
+
 	protected void finalize() throws Throwable {
-	    try {
-	    	TDB.sync(model);
-	    	model.close();
-	    	System.gc();
-	    } finally {
-	        super.finalize();
-	    }
+		try {
+			TDB.sync(model);
+			model.close();
+			System.gc();
+		} finally {
+			super.finalize();
+		}
 	}
 }

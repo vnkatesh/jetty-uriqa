@@ -40,7 +40,8 @@ public class UriqaHandler extends AbstractHandler {
 			response.setContentType(MimeTypes.TEXT_XML);
 			if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
 				paramMap.remove(UriqaConstants.Parameters.FORMAT);
-				paramMap.put(UriqaConstants.Parameters.FORMAT, request.getHeader(UriqaConstants.Parameters.FORMAT));
+				paramMap.put(UriqaConstants.Parameters.FORMAT,
+						 request.getHeader(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML) ? UriqaConstants.Lang.RDFXML : request.getHeader(UriqaConstants.Parameters.FORMAT));
 			}
 			if (request.getHeader(UriqaConstants.Parameters.NAMING) != null) {
 				paramMap.remove(UriqaConstants.Parameters.NAMING);
