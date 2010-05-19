@@ -22,7 +22,8 @@ public class UriqaConstants {
 	public class Parameters {
 		public final static String FORMAT="format",
 		NAMING= "naming",
-		INFERENCE= "inference";
+		INFERENCE= "inference",
+		URI="URIQA-uri";
 	}
 
 	public class Values {
@@ -34,6 +35,20 @@ public class UriqaConstants {
 		URI="uri",
 		INC="include",
 		EXC="exclude";
+	}
+	
+	public class Query {
+		public final static String INSERT="INSERT",
+		MODIFY="MODIFY",
+		DELETE="DELETE",
+		SELECT="SELECT",
+		ASK="ASK",
+		CONSTRUCT="CONSTRUCT",
+		DESCRIBE="DESCRIBE",
+		LOAD="LOAD",
+		CLEAR="CLEAR",
+		DROP="DROP",
+		CREATE="CREATE";
 	}
 	
 }

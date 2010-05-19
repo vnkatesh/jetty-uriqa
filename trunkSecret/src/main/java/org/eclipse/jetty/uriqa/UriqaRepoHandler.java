@@ -35,6 +35,9 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
+import com.hp.hpl.jena.graph.query.Pattern;
+import com.hp.hpl.jena.ontology.OntModel;
+import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.query.Query;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
@@ -51,13 +54,15 @@ import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
+import com.hp.hpl.jena.update.UpdateAction;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	private static UriqaRepoHandler sharedInstance = null;
 
-	private static Model model = null;
+	private static Model base = null;
+	private static OntModel model = null;
 	//private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
 	private String baseURI="http://localhost";
 	private String DBdirectory;
@@ -101,18 +106,19 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			{
 				model.enterCriticalSection(Lock.WRITE);
 				try {
-					model = ModelFactory.createDefaultModel();
+					model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF);
 				} finally {
 					model.leaveCriticalSection();
 				}
 			}
 			else
-				model = ModelFactory.createDefaultModel();
+				model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF);
 		}
 		else
 		{
 			DBdirectory = "/home/venkatesh/UriqaDB_"+Integer.toString(hash);
-			model = TDBFactory.createModel(DBdirectory);
+			base = TDBFactory.createModel(DBdirectory);
+			model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF, base);
 		}
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
@@ -222,6 +228,20 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		reader.close();
 		if (reader.read() >= 0)
 			throw new IllegalStateException("Not closed");
+				
+		//TODO Any other efficient way to compare them?
+		if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT) || queryString.toUpperCase().contains(UriqaConstants.Query.DELETE) 
+				|| queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY) || queryString.toUpperCase().contains(UriqaConstants.Query.LOAD) 
+				|| queryString.toUpperCase().contains(UriqaConstants.Query.CLEAR) || queryString.toUpperCase().contains(UriqaConstants.Query.DROP) || queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
+
+			model.enterCriticalSection(Lock.WRITE);
+			try {
+				UpdateAction.parseExecute(queryString, model);
+			} finally {
+				model.leaveCriticalSection();
+			}
+			return ;
+		}
 
 		Query query = QueryFactory.create(queryString) ;
 		// TODO Only select query, therefore - No Update queries and corresponding lock?
@@ -247,14 +267,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			if (query.isConstructType())
 			{
 				Model tempmodel = qexec.execConstruct();
-				//TODO CBD write
-				tempmodel.write(output);
+				tempmodel.write(output, paramMap.get(UriqaConstants.Parameters.FORMAT));
 			}
 			if (query.isDescribeType())
 			{
 				Model tempmodel = qexec.execDescribe();
-				//TODO CBD write
-				tempmodel.write(output);
+				tempmodel.write(output, paramMap.get(UriqaConstants.Parameters.FORMAT));
 			}
 			qexec.close();
 		} finally { model.leaveCriticalSection() ; }		
@@ -269,11 +287,11 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		try {
 			if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.HTML))
 			{
-				rdf2html(getCBD(model.getResource(baseURIPath)), response);
+				rdf2html(getCBD(model.getResource(baseURIPath), model), response);
 			}
 			else
 			{
-				getCBD(model.getResource(baseURIPath)).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+				getCBD(model.getResource(baseURIPath), model).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
 			}
 		} finally {
 			model.leaveCriticalSection();
@@ -308,11 +326,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		out.close();
 	}
 
-	//TODO Make getCBD more generalized. i.e for any model, so that I can use it for tempmodel.
-	private static Model getCBD(Resource r) {
-		model.enterCriticalSection(Lock.READ);
+	private static Model getCBD(Resource r, Model data) {
+		data.enterCriticalSection(Lock.READ);
 		try {
-			StmtIterator iter = model.listStatements(r, null, (RDFNode) null);
+			StmtIterator iter = data.listStatements(r, null, (RDFNode) null);
 			Model tempmodel = ModelFactory.createDefaultModel();
 			while (iter.hasNext())
 			{
@@ -320,7 +337,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				tempmodel.add(stmt);
 				if (stmt.getObject().isAnon())
 				{
-					tempmodel.add(getClean((Resource) stmt.getObject()));
+					tempmodel.add(getClean((Resource) stmt.getObject(), data));
 				}
 				//TODO Reification stuff.
 				//Maybe this link can help: http://jena.sourceforge.net/how-to/reification.html
@@ -336,14 +353,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			}
 			return tempmodel;
 		} finally {
-			model.leaveCriticalSection();
+			data.leaveCriticalSection();
 		}
 	}
 
-	private static Model getClean(Resource r) {
-		model.enterCriticalSection(Lock.READ);
+	private static Model getClean(Resource r, Model data) {
+		data.enterCriticalSection(Lock.READ);
 		try {
-			StmtIterator iter = model.listStatements( r, null, (RDFNode) null);
+			StmtIterator iter = data.listStatements( r, null, (RDFNode) null);
 			Model cleanModel = ModelFactory.createDefaultModel();
 			while (iter.hasNext())
 			{
@@ -351,12 +368,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				cleanModel.add(stmt);
 				if (stmt.getObject().isAnon())
 				{
-					cleanModel.add(getClean((Resource) stmt.getObject()));
+					cleanModel.add(getClean((Resource) stmt.getObject(), data));
 				}
 			}
 			return cleanModel;
 		} finally {
-			model.leaveCriticalSection();
+			data.leaveCriticalSection();
 		}
 	}
 
@@ -383,7 +400,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		System.out.println("deleting resource"+baseURIPath);
 		model.enterCriticalSection(Lock.WRITE);
 		try {
-			model.remove(getCBD(model.getResource(baseURIPath)));
+			model.remove(getCBD(model.getResource(baseURIPath), model));
 		} finally {
 			model.leaveCriticalSection();
 		}

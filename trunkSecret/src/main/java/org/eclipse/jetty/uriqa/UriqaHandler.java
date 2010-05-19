@@ -1,6 +1,7 @@
 package org.eclipse.jetty.uriqa;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.HashMap;
 
 import javax.servlet.ServletException;
@@ -36,6 +37,11 @@ public class UriqaHandler extends AbstractHandler {
 		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
 				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY))
 		{
+			if (request.getHeader(UriqaConstants.Parameters.URI) != null)
+			{
+				URL uri = new URL(request.getHeader(UriqaConstants.Parameters.URI));
+				baseRequest.setPathInfo(uri.getPath());
+			}
 			response.setStatus(HttpServletResponse.SC_OK);
 			response.setContentType(MimeTypes.TEXT_XML);
 			if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
