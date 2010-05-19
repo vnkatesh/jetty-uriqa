@@ -35,7 +35,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
-import com.hp.hpl.jena.graph.query.Pattern;
 import com.hp.hpl.jena.ontology.OntModel;
 import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.query.Query;
@@ -50,6 +49,7 @@ import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
+import com.hp.hpl.jena.reasoner.ValidityReport;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
 import com.hp.hpl.jena.tdb.TDB;
@@ -120,6 +120,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			base = TDBFactory.createModel(DBdirectory);
 			model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF, base);
 		}
+		model.prepare();
+		//TODO Confusion with setDerivationLogging, reasoner.setDerivationLogging, PROPderivationLogging
+		model.setDerivationLogging(true);
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
 		//		HashMap<String, String> map = new HashMap<String, String>();
@@ -228,7 +231,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		reader.close();
 		if (reader.read() >= 0)
 			throw new IllegalStateException("Not closed");
-				
+
 		//TODO Any other efficient way to compare them?
 		if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT) || queryString.toUpperCase().contains(UriqaConstants.Query.DELETE) 
 				|| queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY) || queryString.toUpperCase().contains(UriqaConstants.Query.LOAD) 
@@ -236,7 +239,34 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 			model.enterCriticalSection(Lock.WRITE);
 			try {
-				UpdateAction.parseExecute(queryString, model);
+				boolean inference = paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC);
+				if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT)	|| queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY)
+						|| queryString.toUpperCase().contains(UriqaConstants.Query.LOAD) || queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
+					OntModel tempmodel = ModelFactory.createOntologyModel();
+					tempmodel.add(model);
+					if (inference) {
+						UpdateAction.parseExecute(queryString, tempmodel.getDeductionsModel());
+					} else {
+						UpdateAction.parseExecute(queryString, tempmodel.getRawModel());
+					}
+					if (!tempmodel.validate().isValid()) {
+						//TODO Error codes and response and validity report statements.
+					} else {
+						if (inference) {
+							UpdateAction.parseExecute(queryString, model.getDeductionsModel());
+						} else {
+							UpdateAction.parseExecute(queryString, model.getRawModel());
+						}
+						model.rebind();
+					}
+				} else {
+					if (inference) {
+						UpdateAction.parseExecute(queryString, model.getDeductionsModel());
+					} else {
+						UpdateAction.parseExecute(queryString, model.getRawModel());
+					}
+					model.rebind();
+				}
 			} finally {
 				model.leaveCriticalSection();
 			}
@@ -247,7 +277,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		// TODO Only select query, therefore - No Update queries and corresponding lock?
 		model.enterCriticalSection(Lock.READ) ;
 		try {
-			QueryExecution qexec = QueryExecutionFactory.create(query, model) ;
+			QueryExecution qexec = null;
+			if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC)) {
+				qexec = QueryExecutionFactory.create(query, model.getDeductionsModel());
+			} else {
+				qexec = QueryExecutionFactory.create(query, model.getRawModel());
+			}
+
 			if (query.isSelectType())
 			{
 				ResultSet results = qexec.execSelect();
@@ -287,11 +323,17 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		try {
 			if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.HTML))
 			{
-				rdf2html(getCBD(model.getResource(baseURIPath), model), response);
+				if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
+					rdf2html(getCBD(model.getResource(baseURIPath), model.getDeductionsModel()), response);
+				else
+					rdf2html(getCBD(model.getResource(baseURIPath), model.getRawModel()), response);
 			}
 			else
 			{
-				getCBD(model.getResource(baseURIPath), model).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+				if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
+					getCBD(model.getResource(baseURIPath), model.getDeductionsModel()).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+				else
+					getCBD(model.getResource(baseURIPath), model.getRawModel()).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
 			}
 		} finally {
 			model.leaveCriticalSection();
@@ -383,6 +425,17 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.enterCriticalSection(Lock.WRITE);
 		try {
 			model.read(request.getInputStream(), baseURI );
+			ValidityReport validity = model.validate();
+			if (!validity.isValid()) {
+				//TODO set response code.
+				//TODO set response output as the errors.
+				Model tempmodel = ModelFactory.createDefaultModel();
+				tempmodel.read(request.getInputStream(), baseURI );
+				model.removeSubModel(tempmodel, false);
+			}
+			else {
+				model.rebind();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (JenaException e) {
@@ -401,6 +454,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.enterCriticalSection(Lock.WRITE);
 		try {
 			model.remove(getCBD(model.getResource(baseURIPath), model));
+			model.rebind();
 		} finally {
 			model.leaveCriticalSection();
 		}
