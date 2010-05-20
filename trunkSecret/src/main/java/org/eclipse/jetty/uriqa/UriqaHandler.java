@@ -42,12 +42,13 @@ public class UriqaHandler extends AbstractHandler {
 				URL uri = new URL(request.getHeader(UriqaConstants.Parameters.URI));
 				baseRequest.setPathInfo(uri.getPath());
 			}
+			//TODO take this internally. set headers there.
 			response.setStatus(HttpServletResponse.SC_OK);
 			response.setContentType(MimeTypes.TEXT_XML);
 			if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
 				paramMap.remove(UriqaConstants.Parameters.FORMAT);
 				paramMap.put(UriqaConstants.Parameters.FORMAT,
-						 request.getHeader(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML) ? UriqaConstants.Lang.RDFXML : request.getHeader(UriqaConstants.Parameters.FORMAT));
+						request.getHeader(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML) ? UriqaConstants.Lang.RDFXML : request.getHeader(UriqaConstants.Parameters.FORMAT));
 			}
 			if (request.getHeader(UriqaConstants.Parameters.NAMING) != null) {
 				paramMap.remove(UriqaConstants.Parameters.NAMING);

@@ -10,15 +10,21 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringReader;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.ParserConfigurationException;
@@ -64,12 +70,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	private static Model base = null;
 	private static OntModel model = null;
 	//private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
-	private String baseURI="http://localhost";
+	private URI baseURI=new URI("http://localhost");
 	private String DBdirectory;
 
 	public UriqaRepoHandler(String baseURI) throws Exception {
 		if(baseURI != null)
-			this.baseURI=baseURI;
+			this.baseURI=new URI(baseURI);
 		this.start();
 	}
 
@@ -125,17 +131,16 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.setDerivationLogging(true);
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
-		//		HashMap<String, String> map = new HashMap<String, String>();
-		//		map.put("xmlns:rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-		//		map.put("xmlns:rdfs","http://www.w3.org/2000/01/rdf-schema#");
-		//		map.put("xmlns:owl","http://www.w3.org/2002/07/owl#");
-		//		map.put("xmlns:dc","http://purl.org/dc/elements/1.1/");
-		//		map.put("xmlns:dct","http://purl.org/dc/terms/");
-		//		map.put("xmlns:xsd","http://www.w3.org/2001/XMLSchema#");
-		//		map.put("xmlns:foaf","http://xmlns.com/foaf/0.1/");
-		//		map.put("xmlns:ex","http://localhost/");
-		//		model.setNsPrefixes(map);
-		//this.loadFromResource(INITIAL_REPO, baseURI);
+		HashMap<String, String> map = new HashMap<String, String>(8);
+		map.put("rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+		map.put("rdfs","http://www.w3.org/2000/01/rdf-schema#");
+		map.put("owl","http://www.w3.org/2002/07/owl#");
+		map.put("dc","http://purl.org/dc/elements/1.1/");
+		map.put("dct","http://purl.org/dc/terms/");
+		map.put("xsd","http://www.w3.org/2001/XMLSchema#");
+		map.put("foaf","http://xmlns.com/foaf/0.1/");
+		map.put(baseURI.getHost(),baseURI.toString());
+		model.setNsPrefixes(map);
 	}
 
 	public static void printModeltoConsole()
@@ -180,7 +185,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	public void handleRequest(HttpServletRequest request, HttpServletResponse response, String method, HashMap<String, String> paramMap) {
 		//TODO Better response code if the resource was not actually found.
-		String baseURIpath = baseURI+(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
+		String baseURIpath = baseURI.toString()+(request.getPathInfo().startsWith("/")?request.getPathInfo():"/"+request.getPathInfo());
 		if (method.equals(UriqaConstants.Methods.MGET))
 		{
 			try {
@@ -193,12 +198,22 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				e.printStackTrace();
 			} catch (ParserConfigurationException e) {
 				e.printStackTrace();
+			} catch (IllegalArgumentException e) {
+				e.printStackTrace();
+			} catch (SecurityException e) {
+				e.printStackTrace();
+			} catch (IllegalAccessException e) {
+				e.printStackTrace();
+			} catch (InvocationTargetException e) {
+				e.printStackTrace();
+			} catch (NoSuchMethodException e) {
+				e.printStackTrace();
 			}
 		}
 		if (method.equals(UriqaConstants.Methods.MPUT))
 		{
 			try {
-				doPut(baseURI, request);
+				doPut(baseURI.toString(), request);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -208,14 +223,27 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		if (method.equals(UriqaConstants.Methods.MQUERY))
 		{
 			try {
-				doQuery(request, response.getOutputStream(), paramMap);
+				try {
+					doQuery(request, response, paramMap);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				} catch (SecurityException e) {
+					e.printStackTrace();
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				} catch (InvocationTargetException e) {
+					e.printStackTrace();
+				} catch (NoSuchMethodException e) {
+					e.printStackTrace();
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
-	private void doQuery(HttpServletRequest request, ServletOutputStream output, HashMap<String, String> paramMap) throws IOException {
+	private void doQuery(HttpServletRequest request, HttpServletResponse response, HashMap<String, String> paramMap)
+	throws IOException, IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
 		BufferedReader reader = request.getReader();
 		int count = 0;
 		String line;
@@ -235,7 +263,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//TODO Any other efficient way to compare them?
 		if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT) || queryString.toUpperCase().contains(UriqaConstants.Query.DELETE) 
 				|| queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY) || queryString.toUpperCase().contains(UriqaConstants.Query.LOAD) 
-				|| queryString.toUpperCase().contains(UriqaConstants.Query.CLEAR) || queryString.toUpperCase().contains(UriqaConstants.Query.DROP) || queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
+				|| queryString.toUpperCase().contains(UriqaConstants.Query.CLEAR) || queryString.toUpperCase().contains(UriqaConstants.Query.DROP)
+				|| queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
 
 			model.enterCriticalSection(Lock.WRITE);
 			try {
@@ -283,38 +312,58 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			} else {
 				qexec = QueryExecutionFactory.create(query, model.getRawModel());
 			}
-
 			if (query.isSelectType())
 			{
 				ResultSet results = qexec.execSelect();
-				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML))
-					ResultSetFormatter.outputAsXML(output, results);
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML)) {
+					//TODO does the new outputstream copy and content-length work well?? esp wrt closed by remote connection problem??
+					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsXML", new Class[] { OutputStream.class, ResultSet.class}), new Object[] {results});
+				}
 				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
-					ResultSetFormatter.outputAsJSON(output, results);
+					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsJSON", new Class[] { OutputStream.class, ResultSet.class}), new Object[] {results});
 			}
 			if (query.isAskType())
 			{
 				Boolean answer = qexec.execAsk();
-				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML))
-					ResultSetFormatter.outputAsXML(output, answer);
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML))
+					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsXML", new Class[] { OutputStream.class, Boolean.class}), new Object[] {answer});
 				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
-					ResultSetFormatter.outputAsJSON(output, answer);
+					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsJSON", new Class[] { OutputStream.class, Boolean.class}), new Object[] {answer});
 			}
-			if (query.isConstructType())
-			{
+			if (query.isConstructType()) {
 				Model tempmodel = qexec.execConstruct();
-				tempmodel.write(output, paramMap.get(UriqaConstants.Parameters.FORMAT));
+				contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), tempmodel});
 			}
-			if (query.isDescribeType())
-			{
+			if (query.isDescribeType()) {
 				Model tempmodel = qexec.execDescribe();
-				tempmodel.write(output, paramMap.get(UriqaConstants.Parameters.FORMAT));
+				contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), tempmodel});
 			}
 			qexec.close();
 		} finally { model.leaveCriticalSection() ; }		
 	}
 
-	private void doGet(String baseURIPath, HttpServletResponse response, HashMap<String, String> paramMap) throws IOException, TransformerException, SAXException, ParserConfigurationException
+	private void contentLengthPrint(HttpServletResponse response, Method method, Object[] arguments)
+	throws IOException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		ArrayList<Object> args = new ArrayList<Object>();
+		if (Modifier.isStatic(method.getModifiers())){
+			args.add(out);
+			args.addAll(Arrays.asList(arguments));
+			method.invoke(null, args.toArray());
+		} else {
+			args.add(arguments[arguments.length-1]);
+			args.add(out);
+			args.addAll(Arrays.asList(arguments));
+			args.remove(args.size()-1);
+			//TODO Test that this works fine.
+			method.invoke(args.toArray());
+		}
+		response.setContentLength(out.toByteArray().length);
+		response.getOutputStream().write(out.toByteArray());
+	}
+
+	private void doGet(String baseURIPath, HttpServletResponse response, HashMap<String, String> paramMap)
+	throws IOException, TransformerException, SAXException, ParserConfigurationException, IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException
 	{
 		System.out.println("getting resource "+baseURIPath);
 		//TODO Custom printModel for CBD. Understand? Check for Anonnodes and print CBD of them inside itself. 
@@ -331,9 +380,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			else
 			{
 				if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
-					getCBD(model.getResource(baseURIPath), model.getDeductionsModel()).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+					contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), getCBD(model.getResource(baseURIPath), model.getDeductionsModel())});
 				else
-					getCBD(model.getResource(baseURIPath), model.getRawModel()).write(response.getWriter(), paramMap.get(UriqaConstants.Parameters.FORMAT));
+					contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), getCBD(model.getResource(baseURIPath), model.getRawModel())});
 			}
 		} finally {
 			model.leaveCriticalSection();
@@ -348,7 +397,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		PrintWriter out = new PrintWriter(response.getOutputStream());           
 		InputSource iSource;
 		ByteArrayOutputStream o = new ByteArrayOutputStream();
-		data.write(o, "RDF/XML-ABBREV");
+		data.write(o, UriqaConstants.Lang.RDFXML);
 		o.flush();
 		String rdfxml = o.toString("UTF8");
 		iSource = new InputSource(new StringReader(rdfxml));
@@ -364,11 +413,15 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "-//W3C//DTD XHTML+RDFa 1.0//EN");
 		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd");
 		transformer.setOutputProperty(OutputKeys.ENCODING, "UTF8");
-		transformer.transform(new SAXSource(xmlReader, iSource), new StreamResult(out));
+		//TODO make contentPrintLength even more generalized to incorporate the below code:-
+		ByteArrayOutputStream out2 = new ByteArrayOutputStream();
+		transformer.transform(new SAXSource(xmlReader, iSource), new StreamResult(out2));
+		response.setContentLength(out2.toByteArray().length);
+		response.getOutputStream().write(out2.toByteArray());
 		out.close();
 	}
 
-	private static Model getCBD(Resource r, Model data) {
+	private Model getCBD(Resource r, Model data) {
 		data.enterCriticalSection(Lock.READ);
 		try {
 			StmtIterator iter = data.listStatements(r, null, (RDFNode) null);
