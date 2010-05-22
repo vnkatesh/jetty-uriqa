@@ -88,7 +88,7 @@ public class TestMPut {
 			Socket sock = new Socket(addr, port);
 			String path = "/doesntMatter";
 			BufferedWriter  wr = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream(),"UTF-8"));
-			wr.write("MPUT " + path + " HTTP/1.0\r\n");
+			wr.write("MPUT " + path + " HTTP/1.1\r\n");
 			wr.write("Host: localhost:8080\r\n");
 			wr.write("Content-Length: " + xmldata.length() + "\r\n");
 			wr.write("Content-Type: text/xml; charset=\"utf-8\"\r\n");

@@ -16,7 +16,8 @@ public class UriqaConstants {
 		public final static String MGET= "MGET",
 		MPUT= "MPUT",
 		MDELETE= "MDELETE",
-		MQUERY= "MQUERY";
+		MQUERY= "MQUERY",
+		MTRACE="MTRACE";
 	}
 
 	public class Parameters {

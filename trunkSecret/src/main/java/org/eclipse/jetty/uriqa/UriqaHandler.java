@@ -65,7 +65,7 @@ public class UriqaHandler extends AbstractHandler {
 		//UriqaRepoHandler.getDefault().printModeltoConsole();
 
 		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
-				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY)) {
+				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY) || baseRequest.getMethod().equals(UriqaConstants.Methods.MTRACE)) {
 			
 			((Request)request).setHandled(true);
 			baseRequest.setHandled(true);

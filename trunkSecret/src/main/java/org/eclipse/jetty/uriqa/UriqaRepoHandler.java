@@ -24,7 +24,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Iterator;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -53,15 +53,17 @@ import com.hp.hpl.jena.query.QueryFactory;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.query.ResultSetFormatter;
 import com.hp.hpl.jena.rdf.model.Model;
-import com.hp.hpl.jena.rdf.model.ModelChangedListener;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
+import com.hp.hpl.jena.reasoner.Derivation;
 import com.hp.hpl.jena.reasoner.ValidityReport;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
+import com.hp.hpl.jena.shared.impl.PrefixMappingImpl;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
 import com.hp.hpl.jena.update.UpdateAction;
@@ -134,6 +136,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		model.prepare();
 		//TODO Confusion with setDerivationLogging, reasoner.setDerivationLogging, PROPderivationLogging
 		model.setDerivationLogging(true);
+		model.rebind();
 		//model.add(FileManager.get().loadModel(INITIAL_REPO));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
 		HashMap<String, String> map = new HashMap<String, String>(8);
@@ -225,6 +228,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 		if (method.equals(UriqaConstants.Methods.MDELETE))
 			doDelete(baseURIpath);
+		if (method.equals(UriqaConstants.Methods.MTRACE))
+		{
+			try {
+				doDerive(request, response);
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
 		if (method.equals(UriqaConstants.Methods.MQUERY))
 		{
 			try {
@@ -247,7 +258,75 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	private void doQuery(HttpServletRequest request, HttpServletResponse response, HashMap<String, String> paramMap)
+	public void doDerive(HttpServletRequest request, HttpServletResponse response) throws IOException {
+
+		BufferedReader reader = request.getReader();
+		int count = 0;
+		String line;
+		String queryString = new String();
+		PrefixMappingImpl prefix = new PrefixMappingImpl();
+		ByteArrayOutputStream bytearray = new ByteArrayOutputStream();
+		PrintWriter out = new PrintWriter(bytearray);
+		while ((line = reader.readLine()) != null)
+		{
+			queryString +=line;
+			//TODO Create some actual parser maybe?
+			//TODO Does not close properly!
+			if (line.toLowerCase().startsWith("prefix")) {
+				//tab character.
+				prefix.setNsPrefix(line.split("	")[1].split(":")[0], line.split("	")[2].split(">")[0].split("<")[1]);
+			} else if (line.toLowerCase().startsWith("trace") || line.toLowerCase().startsWith("\r\n") || line.toLowerCase().isEmpty()) {
+				//ignore
+			} else {
+				//tab
+				String[] q = line.split("	");
+				Resource subject = null;
+				Property property = null;
+				String literal = null;
+				Resource object = null;
+				subject = model.getResource(prefix.getNsPrefixURI(q[0].split(":")[0])+q[0].split(":")[1]);
+				property = model.getProperty(prefix.getNsPrefixURI(q[1].split(":")[0])+q[1].split(":")[1]);
+				if (q[2].contains(":"))
+					object = model.getResource(prefix.getNsPrefixURI(q[2].split(":")[0])+q[2].split(":")[1]);
+				else
+					literal = q[2];
+				if (object!=null) {
+					for (StmtIterator i = model.listStatements(subject, property, object); i.hasNext(); ) {
+						Statement s = i.nextStatement();
+						//statement is:
+						out.println(s);
+						for (Iterator id = model.getDerivation(s); id.hasNext(); ) {
+							Derivation deriv = (Derivation) id.next();
+							deriv.printTrace(out, true);
+						}
+					}
+				} else {
+					for (StmtIterator i = model.listStatements(subject, property, literal); i.hasNext(); ) {
+						Statement s = i.nextStatement();
+						out.println(s);
+						for (Iterator id = model.getDerivation(s); id.hasNext(); ) {
+							Derivation deriv = (Derivation) id.next();
+							deriv.printTrace(out, true);
+						}
+					}
+				}
+			}
+
+			queryString +="\n";
+			count += line.length();
+		}
+
+		reader.close();
+		if (reader.read() >= 0)
+			throw new IllegalStateException("Not closed");
+
+		out.flush();
+		response.setContentLength(bytearray.toByteArray().length);
+		response.getOutputStream().write(bytearray.toByteArray());
+		response.getOutputStream().close();
+	}
+
+	public void doQuery(HttpServletRequest request, HttpServletResponse response, HashMap<String, String> paramMap)
 	throws IOException, IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
 		BufferedReader reader = request.getReader();
 		int count = 0;
@@ -321,7 +400,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			{
 				ResultSet results = qexec.execSelect();
 				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML)) {
-					//TODO does the new outputstream copy and content-length work well?? esp wrt closed by remote connection problem??
 					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsXML", new Class[] { OutputStream.class, ResultSet.class}), new Object[] {results}, null);
 				}
 				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
@@ -367,14 +445,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				args.add(out);
 			args.addAll(Arrays.asList(arguments));
 			args.remove(args.size()-1);
-			//TODO Test that this works fine.
 			method.invoke(arguments[arguments.length-1], args.toArray());
 		}
 		response.setContentLength(out.toByteArray().length);
 		response.getOutputStream().write(out.toByteArray());
 	}
 
-	private void doGet(String baseURIPath, HttpServletResponse response, HashMap<String, String> paramMap)
+	public void doGet(String baseURIPath, HttpServletResponse response, HashMap<String, String> paramMap)
 	throws IOException, TransformerException, SAXException, ParserConfigurationException, IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException
 	{
 		System.out.println("getting resource "+baseURIPath);
@@ -484,7 +561,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	private void doPut(String baseURI, HttpServletRequest request, HashMap<String, String> paramMap) throws IOException
+	public void doPut(String baseURI, HttpServletRequest request, HashMap<String, String> paramMap) throws IOException
 	{
 		System.out.println("putting resource.");
 		model.enterCriticalSection(Lock.WRITE);
@@ -513,7 +590,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	/**
 	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
 	 */
-	private void doDelete(String baseURIPath)
+	public void doDelete(String baseURIPath)
 	{
 		System.out.println("deleting resource"+baseURIPath);
 		model.enterCriticalSection(Lock.WRITE);
