@@ -27,6 +27,10 @@ public class UriqaHandler extends AbstractHandler {
 	public void handle(String target, Request baseRequest,
 			HttpServletRequest request, HttpServletResponse response)
 	throws IOException, ServletException {
+
+		if (baseRequest.isHandled())
+			return;
+
 		if (baseURI == null) {
 			baseURI = baseRequest.getScheme()+"://"+baseRequest.getServerName();
 			UriqaRepoHandler.getDefault(baseURI);
@@ -34,37 +38,37 @@ public class UriqaHandler extends AbstractHandler {
 		System.out.println("****************Handler***************");
 		//System.out.println("getLocalHost(): "+baseRequest.getConnection().getEndPoint().getLocalHost());
 		//TODO use UriqaMethods ENUM Matching. Better DS required probably.
-		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
-				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY))
+
+		if (request.getHeader(UriqaConstants.Parameters.URI) != null)
 		{
-			if (request.getHeader(UriqaConstants.Parameters.URI) != null)
-			{
-				URL uri = new URL(request.getHeader(UriqaConstants.Parameters.URI));
-				baseRequest.setPathInfo(uri.getPath());
-			}
-			//TODO take this internally. set headers there.
-			response.setStatus(HttpServletResponse.SC_OK);
-			response.setContentType(MimeTypes.TEXT_XML);
-			if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
-				paramMap.remove(UriqaConstants.Parameters.FORMAT);
-				paramMap.put(UriqaConstants.Parameters.FORMAT,
-						request.getHeader(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML) ? UriqaConstants.Lang.RDFXML : request.getHeader(UriqaConstants.Parameters.FORMAT));
-			}
-			if (request.getHeader(UriqaConstants.Parameters.NAMING) != null) {
-				paramMap.remove(UriqaConstants.Parameters.NAMING);
-				paramMap.put(UriqaConstants.Parameters.NAMING, request.getHeader(UriqaConstants.Parameters.NAMING));
-			}
-			if (request.getHeader(UriqaConstants.Parameters.INFERENCE) != null) {
-				paramMap.remove(UriqaConstants.Parameters.INFERENCE);
-				paramMap.put(UriqaConstants.Parameters.INFERENCE, request.getHeader(UriqaConstants.Parameters.INFERENCE));
-			}
-			UriqaRepoHandler.getDefault().handleRequest(request,response, baseRequest.getMethod(), paramMap);
-			//UriqaRepoHandler.getDefault().printModeltoConsole();
-			//TODO: Content-type and content-length.
-			//TODO Or is it baseRequest.setHandled()??
+			URL uri = new URL(request.getHeader(UriqaConstants.Parameters.URI));
+			baseRequest.setPathInfo(uri.getPath());
+		}
+		//TODO take this internally. set headers there.
+		response.setStatus(HttpServletResponse.SC_OK);
+		//TODO: Content-type
+		response.setContentType(MimeTypes.TEXT_XML);
+		if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
+			paramMap.remove(UriqaConstants.Parameters.FORMAT);
+			paramMap.put(UriqaConstants.Parameters.FORMAT,
+					request.getHeader(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.RDFXML) ? UriqaConstants.Lang.RDFXML : request.getHeader(UriqaConstants.Parameters.FORMAT));
+		}
+		if (request.getHeader(UriqaConstants.Parameters.NAMING) != null) {
+			paramMap.remove(UriqaConstants.Parameters.NAMING);
+			paramMap.put(UriqaConstants.Parameters.NAMING, request.getHeader(UriqaConstants.Parameters.NAMING));
+		}
+		if (request.getHeader(UriqaConstants.Parameters.INFERENCE) != null) {
+			paramMap.remove(UriqaConstants.Parameters.INFERENCE);
+			paramMap.put(UriqaConstants.Parameters.INFERENCE, request.getHeader(UriqaConstants.Parameters.INFERENCE));
+		}
+		UriqaRepoHandler.getDefault().handleRequest(request,response, baseRequest.getMethod(), paramMap);
+		//UriqaRepoHandler.getDefault().printModeltoConsole();
+
+		if(baseRequest.getMethod().equals(UriqaConstants.Methods.MGET) || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
+				|| baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE) || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY)) {
+			
 			((Request)request).setHandled(true);
 			baseRequest.setHandled(true);
-			//TODO check after installing other Handlers also..
 		}
 	}
 }
