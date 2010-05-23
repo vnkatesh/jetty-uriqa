@@ -8,7 +8,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 
@@ -35,8 +34,6 @@ public class UriqaHandler extends AbstractHandler {
 			baseURI = baseRequest.getScheme()+"://"+baseRequest.getServerName();
 			UriqaRepoHandler.getDefault(baseURI);
 		}
-		System.out.println("****************Handler***************");
-		//System.out.println("getLocalHost(): "+baseRequest.getConnection().getEndPoint().getLocalHost());
 		//TODO use UriqaMethods ENUM Matching. Better DS required probably.
 
 		if (request.getHeader(UriqaConstants.Parameters.URI) != null)

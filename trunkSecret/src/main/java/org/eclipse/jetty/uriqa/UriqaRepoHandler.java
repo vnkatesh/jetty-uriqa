@@ -41,6 +41,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
+import org.eclipse.jetty.util.log.Log;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
@@ -71,6 +72,7 @@ import com.hp.hpl.jena.shared.impl.PrefixMappingImpl;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
 import com.hp.hpl.jena.update.UpdateAction;
+import com.hp.hpl.jena.util.FileManager;
 
 @SuppressWarnings("serial")
 public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
@@ -79,13 +81,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 	private static Model base = null;
 	private static OntModel model = null;
-	//private final String INITIAL_REPO="org/eclipse/jetty/uriqa/w3.rdf";
-	private URI baseURI=new URI("http://localhost");
-	private String DBdirectory;
+	private URI baseURI= null;
 
 	public UriqaRepoHandler(String baseURI) throws Exception {
 		if(baseURI != null)
-			this.baseURI=new URI(baseURI);
+			this.baseURI = new URI(baseURI);
+		else {
+			this.baseURI = new URI(Messages.getString("URIQA_baseURI"));
+		}
 		this.start();
 	}
 
@@ -110,9 +113,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	@Override
 	public void doStart() {
 		//In-Memory Model
-		//this.initializeRepo();
-		//TDB Model
-		this.initializeRepo(System.getProperty("user.dir").toString().hashCode());
+		if (!(new Boolean(Messages.getString("URIQA_TDB"))).booleanValue())
+			this.initializeRepo();
+		else
+			this.initializeRepo(System.getProperty("user.dir").toString().hashCode());
 		model.register(new UriqaModelChangedListener());
 	}
 
@@ -133,7 +137,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 		else
 		{
-			DBdirectory = "/home/venkatesh/UriqaDB_"+Integer.toString(hash);
+			String DBdirectory = Messages.getString("URIQA_dbDirectory")+"UriqaDB_"+Integer.toString(hash);
 			base = TDBFactory.createModel(DBdirectory);
 			model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF, base);
 		}
@@ -141,7 +145,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//TODO Confusion with setDerivationLogging, reasoner.setDerivationLogging, PROPderivationLogging
 		model.setDerivationLogging(true);
 		model.rebind();
-		//model.add(FileManager.get().loadModel(INITIAL_REPO));
+		if (model.isEmpty() && (new Boolean(Messages.getString("URIQA_LOAD"))).booleanValue())
+			model.add(FileManager.get().loadModel(Messages.getString("URIQA_INITIAL_REPO")));
 		//TODO Prefix j.1 has to be removed. for further compatibility with CBD.
 		HashMap<String, String> map = new HashMap<String, String>(8);
 		map.put("rdf","http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -342,7 +347,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 		reader.close();
 		if (reader.read() >= 0)
-			throw new IllegalStateException("Not closed");
+			throw new IllegalStateException(Messages.getString("URIQA_readerErrorMesage"));
 
 		out.flush();
 		response.setContentType(MimeTypes.TEXT_PLAIN);
@@ -369,7 +374,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 
 		reader.close();
 		if (reader.read() >= 0)
-			throw new IllegalStateException("Not closed");
+			throw new IllegalStateException(Messages.getString("URIQA_readerErrorMesage")); 
 
 		//TODO Any other efficient way to compare them?
 		if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT) || queryString.toUpperCase().contains(UriqaConstants.Query.DELETE) 
@@ -542,13 +547,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	throws IOException, TransformerException, SAXException, ParserConfigurationException, IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException 
 	{
 		response.setCharacterEncoding("UTF-8");
-		response.setContentType("text/html");
+		response.setContentType(MimeTypes.TEXT_HTML);
 
 		InputSource iSource;
 		ByteArrayOutputStream o = new ByteArrayOutputStream();
 		data.write(o, UriqaConstants.Lang.RDFXML);
 		o.flush();
-		String rdfxml = o.toString("UTF8");
+		String rdfxml = o.toString(Messages.getString("URIQA_ENCODING"));
 		iSource = new InputSource(new StringReader(rdfxml));
 
 		SAXParserFactory pFactory = SAXParserFactory.newInstance();
@@ -559,9 +564,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		TransformerFactory tFactory = TransformerFactory.newInstance();
 		Transformer transformer = tFactory.newTransformer();
 		transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
-		transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "-//W3C//DTD XHTML+RDFa 1.0//EN");
-		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd");
-		transformer.setOutputProperty(OutputKeys.ENCODING, "UTF8");
+		transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, Messages.getString("URIQA_DOCTYPE_PUBLIC"));
+		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, Messages.getString("URIQA_DOCTYPE_SYSTEM"));
+		transformer.setOutputProperty(OutputKeys.ENCODING, Messages.getString("URIQA_ENCODING"));
 		//TODO make contentPrintLength even more generalized to incorporate the below code:-
 		ByteArrayOutputStream out2 = new ByteArrayOutputStream();
 		contentLengthPrint(response, Transformer.class.getMethod("transform", Source.class, Result.class),
