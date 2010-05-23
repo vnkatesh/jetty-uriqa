@@ -57,6 +57,7 @@ import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
+import com.hp.hpl.jena.rdf.model.RSIterator;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
@@ -65,6 +66,7 @@ import com.hp.hpl.jena.reasoner.ValidityReport;
 import com.hp.hpl.jena.reasoner.ValidityReport.Report;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
+import com.hp.hpl.jena.shared.ReificationStyle;
 import com.hp.hpl.jena.shared.impl.PrefixMappingImpl;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
@@ -507,10 +509,11 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//TODO Its still printing the NodeID thing. Should I remove that?
 		model.enterCriticalSection(Lock.READ);
 		try {
-			if (model.contains(model.getResource(baseURIPath), null, (RDFNode) null)) {
+			if (!model.contains(model.getResource(baseURIPath), null, (RDFNode) null)) {
 				//Not present in model.
 				response.setContentLength(0);
 				response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+				return;
 			}
 			if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.HTML))
 			{
@@ -569,7 +572,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		data.enterCriticalSection(Lock.READ);
 		try {
 			StmtIterator iter = data.listStatements(r, null, (RDFNode) null);
-			Model tempmodel = ModelFactory.createDefaultModel();
+			Model tempmodel = ModelFactory.createDefaultModel(ReificationStyle.Minimal);
 			while (iter.hasNext())
 			{
 				Statement stmt = iter.nextStatement();
@@ -578,17 +581,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				{
 					tempmodel.add(getClean((Resource) stmt.getObject(), data));
 				}
-				//TODO Reification stuff.
-				//Maybe this link can help: http://jena.sourceforge.net/how-to/reification.html
+				//TODO Reification producing orphan nodes. Is that OK? isDefinedBy() is not getting added. Required?
 				//TODO I'm still getting RDF:Node. Can I remove that using custom PrintModel?
-				//TODO Remove getClean if it is redundant and same as getCBD.
-				//			RSIterator iter2 =  model.listReifiedStatements(stmt);
-				//			while(iter2.hasNext())
-				//			{
-				//				Statement stmt2 = iter2.nextRS().getStatement();
-				//				System.out.println("Adding: "+stmt2.getSubject().getURI()+" -> "+ stmt2.getPredicate().getURI()+" -> "+stmt2.getObject().toString());
-				//				tempmodel.add(stmt2);
-				//			}
+				RSIterator iter2 =  model.listReifiedStatements(stmt);
+				while(iter2.hasNext())
+				{
+					Statement stmt2 = iter2.nextRS().getStatement();
+					tempmodel.createReifiedStatement(stmt2);
+				}
 			}
 			return tempmodel;
 		} finally {
