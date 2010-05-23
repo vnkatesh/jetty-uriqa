@@ -44,10 +44,6 @@ public class UriqaHandler extends AbstractHandler {
 			URL uri = new URL(request.getHeader(UriqaConstants.Parameters.URI));
 			baseRequest.setPathInfo(uri.getPath());
 		}
-		//TODO take this internally. set headers there.
-		response.setStatus(HttpServletResponse.SC_OK);
-		//TODO: Content-type
-		response.setContentType(MimeTypes.TEXT_XML);
 		if (request.getHeader(UriqaConstants.Parameters.FORMAT) != null) {
 			paramMap.remove(UriqaConstants.Parameters.FORMAT);
 			paramMap.put(UriqaConstants.Parameters.FORMAT,

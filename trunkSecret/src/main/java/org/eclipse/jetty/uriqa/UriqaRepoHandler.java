@@ -39,6 +39,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -61,6 +62,7 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.reasoner.Derivation;
 import com.hp.hpl.jena.reasoner.ValidityReport;
+import com.hp.hpl.jena.reasoner.ValidityReport.Report;
 import com.hp.hpl.jena.shared.JenaException;
 import com.hp.hpl.jena.shared.Lock;
 import com.hp.hpl.jena.shared.impl.PrefixMappingImpl;
@@ -221,13 +223,13 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		if (method.equals(UriqaConstants.Methods.MPUT))
 		{
 			try {
-				doPut(baseURI.toString(), request, paramMap);
+				doPut(baseURI.toString(), request, paramMap, response);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 		if (method.equals(UriqaConstants.Methods.MDELETE))
-			doDelete(baseURIpath);
+			doDelete(baseURIpath, response);
 		if (method.equals(UriqaConstants.Methods.MTRACE))
 		{
 			try {
@@ -271,7 +273,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		{
 			queryString +=line;
 			//TODO Create some actual parser maybe?
-			//TODO Does not close properly!
+			//TODO Does not close properly. Just checked with others also. Same behaviour. Is that normal??
 			if (line.toLowerCase().startsWith("prefix")) {
 				//tab character.
 				prefix.setNsPrefix(line.split("	")[1].split(":")[0], line.split("	")[2].split(">")[0].split("<")[1]);
@@ -291,20 +293,40 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 				else
 					literal = q[2];
 				if (object!=null) {
+					if (model.listStatements(subject, property, object).toList().size() > 0)
+						response.setStatus(HttpServletResponse.SC_OK);
+					else {
+						response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+						response.setContentLength(0);
+						response.getOutputStream().close();
+						out.close();
+						bytearray.close();
+						return;
+					}
 					for (StmtIterator i = model.listStatements(subject, property, object); i.hasNext(); ) {
 						Statement s = i.nextStatement();
 						//statement is:
 						out.println(s);
-						for (Iterator id = model.getDerivation(s); id.hasNext(); ) {
+						for (Iterator<Derivation> id = model.getDerivation(s); id.hasNext(); ) {
 							Derivation deriv = (Derivation) id.next();
 							deriv.printTrace(out, true);
 						}
 					}
 				} else {
+					if (model.listStatements(subject, property, literal).toList().size() > 0)
+						response.setStatus(HttpServletResponse.SC_OK);
+					else {
+						response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+						response.setContentLength(0);
+						response.getOutputStream().close();
+						out.close();
+						bytearray.close();
+						return;
+					}
 					for (StmtIterator i = model.listStatements(subject, property, literal); i.hasNext(); ) {
 						Statement s = i.nextStatement();
 						out.println(s);
-						for (Iterator id = model.getDerivation(s); id.hasNext(); ) {
+						for (Iterator<Derivation> id = model.getDerivation(s); id.hasNext(); ) {
 							Derivation deriv = (Derivation) id.next();
 							deriv.printTrace(out, true);
 						}
@@ -321,8 +343,11 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			throw new IllegalStateException("Not closed");
 
 		out.flush();
+		response.setContentType(MimeTypes.TEXT_PLAIN);
 		response.setContentLength(bytearray.toByteArray().length);
 		response.getOutputStream().write(bytearray.toByteArray());
+		bytearray.close();
+		out.close();
 		response.getOutputStream().close();
 	}
 
@@ -363,13 +388,23 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 						UpdateAction.parseExecute(queryString, tempmodel.getRawModel());
 					}
 					if (!tempmodel.validate().isValid()) {
-						//TODO Error codes and response and validity report statements.
+						response.setStatus(HttpServletResponse.SC_CONFLICT);
+						String error = "";
+						for (Iterator<Report> i = tempmodel.validate().getReports(); i.hasNext(); ) {
+							error+=" - " + i.next()+ "\r\n";
+						}
+						response.setContentLength(error.length());
+						response.setContentType(MimeTypes.TEXT_PLAIN);
+						response.getWriter().write(error);						
 					} else {
 						if (inference) {
 							UpdateAction.parseExecute(queryString, model.getDeductionsModel());
 						} else {
 							UpdateAction.parseExecute(queryString, model.getRawModel());
 						}
+						//similar to doDelete().
+						response.setContentLength(0);
+						response.setStatus(HttpServletResponse.SC_NO_CONTENT);
 						model.notifyEvent(true);
 					}
 				} else {
@@ -378,6 +413,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 					} else {
 						UpdateAction.parseExecute(queryString, model.getRawModel());
 					}
+					response.setContentLength(0);
+					response.setStatus(HttpServletResponse.SC_NO_CONTENT);
 					model.notifyEvent(true);
 				}
 			} finally {
@@ -387,9 +424,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 
 		Query query = QueryFactory.create(queryString) ;
-		// TODO Only select query, therefore - No Update queries and corresponding lock?
 		model.enterCriticalSection(Lock.READ) ;
 		try {
+			response.setStatus(HttpServletResponse.SC_OK);
 			QueryExecution qexec = null;
 			if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC)) {
 				qexec = QueryExecutionFactory.create(query, model.getDeductionsModel());
@@ -400,31 +437,42 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			{
 				ResultSet results = qexec.execSelect();
 				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML)) {
+					response.setContentType(UriqaConstants.Lang.RDFXML);
 					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsXML", new Class[] { OutputStream.class, ResultSet.class}), new Object[] {results}, null);
 				}
-				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON)) {
+					response.setContentType(MimeTypes.TEXT_JSON);
 					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsJSON", new Class[] { OutputStream.class, ResultSet.class}), new Object[] {results}, null);
+				}
 			}
 			if (query.isAskType())
 			{
 				Boolean answer = qexec.execAsk();
-				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML))
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Lang.RDFXML)) {
+					response.setContentType(UriqaConstants.Lang.RDFXML);
 					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsXML", new Class[] { OutputStream.class, Boolean.class}), new Object[] {answer}, null);
-				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON))
+				}
+				if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.JSON)) {
+					response.setContentType(MimeTypes.TEXT_JSON);
 					contentLengthPrint(response, ResultSetFormatter.class.getMethod("outputAsJSON", new Class[] { OutputStream.class, Boolean.class}), new Object[] {answer}, null);
+				}
 			}
 			if (query.isConstructType()) {
 				Model tempmodel = qexec.execConstruct();
+				response.setContentType(paramMap.get(UriqaConstants.Parameters.FORMAT));
 				contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}),
 						new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), tempmodel}, null);
 			}
 			if (query.isDescribeType()) {
 				Model tempmodel = qexec.execDescribe();
+				response.setContentType(paramMap.get(UriqaConstants.Parameters.FORMAT));
 				contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}),
 						new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), tempmodel}, null);
 			}
 			qexec.close();
-		} finally { model.leaveCriticalSection() ; }		
+		} finally {
+			model.leaveCriticalSection() ;
+		}		
 	}
 
 	private void contentLengthPrint(HttpServletResponse response, Method method, Object[] arguments, ByteArrayOutputStream out)
@@ -459,8 +507,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		//TODO Its still printing the NodeID thing. Should I remove that?
 		model.enterCriticalSection(Lock.READ);
 		try {
+			if (model.contains(model.getResource(baseURIPath), null, (RDFNode) null)) {
+				//Not present in model.
+				response.setContentLength(0);
+				response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+			}
 			if (paramMap.get(UriqaConstants.Parameters.FORMAT).equals(UriqaConstants.Values.HTML))
 			{
+				response.setContentType(MimeTypes.TEXT_HTML);
 				if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
 					rdf2html(getCBD(model.getResource(baseURIPath), model.getDeductionsModel()), response);
 				else
@@ -468,6 +522,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			}
 			else
 			{
+				response.setContentType(paramMap.get(UriqaConstants.Parameters.FORMAT));
 				if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
 					contentLengthPrint(response, Model.class.getMethod("write", new Class[] { OutputStream.class, String.class}),
 							new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT), getCBD(model.getResource(baseURIPath), model.getDeductionsModel())}, null);
@@ -561,7 +616,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		}
 	}
 
-	public void doPut(String baseURI, HttpServletRequest request, HashMap<String, String> paramMap) throws IOException
+	public void doPut(String baseURI, HttpServletRequest request, HashMap<String, String> paramMap, HttpServletResponse response) throws IOException
 	{
 		System.out.println("putting resource.");
 		model.enterCriticalSection(Lock.WRITE);
@@ -569,13 +624,21 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 			model.read(request.getInputStream(), baseURI, paramMap.get(UriqaConstants.Parameters.FORMAT));
 			ValidityReport validity = model.validate();
 			if (!validity.isValid()) {
-				//TODO set response code.
-				//TODO set response output as the errors.
+				response.setStatus(HttpServletResponse.SC_CONFLICT);
+				String error = "";
+				for (Iterator<Report> i = validity.getReports(); i.hasNext(); ) {
+					error+=" - " + i.next()+ "\r\n";
+				}
+				response.setContentLength(error.length());
+				response.setContentType(MimeTypes.TEXT_PLAIN);
+				response.getWriter().write(error);
 				Model tempmodel = ModelFactory.createDefaultModel();
 				tempmodel.read(request.getInputStream(), baseURI, paramMap.get(UriqaConstants.Parameters.FORMAT) );
 				model.removeSubModel(tempmodel, false);
 			}
 			else {
+				response.setContentLength(0);
+				response.setStatus(HttpServletResponse.SC_NO_CONTENT);
 				model.notifyEvent(true);
 			}
 		} catch (IOException e) {
@@ -590,7 +653,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 	/**
 	 * see TODO's of {@link UriqaRepoHandler#doGet(String, PrintWriter)}
 	 */
-	public void doDelete(String baseURIPath)
+	public void doDelete(String baseURIPath, HttpServletResponse response)
 	{
 		System.out.println("deleting resource"+baseURIPath);
 		model.enterCriticalSection(Lock.WRITE);
@@ -600,6 +663,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable{
 		} finally {
 			model.leaveCriticalSection();
 		}
+		response.setContentLength(0);
+		response.setStatus(HttpServletResponse.SC_NO_CONTENT);
 		//TODO the rdf:NodeID's still exist. Is that correct?
 		//TODO the reification statments, should that come in printModeltoConsole()?
 	}
