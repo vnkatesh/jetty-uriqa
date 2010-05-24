@@ -1470,4 +1470,68 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
             super.finalize();
         }
     }
+
+    /**
+     * @return the sharedInstance
+     */
+    private static final UriqaRepoHandler getSharedInstance()
+    {
+        return sharedInstance;
+    }
+
+    /**
+     * @param sharedInstance the sharedInstance to set
+     */
+    private static final void setSharedInstance(UriqaRepoHandler sharedInstance)
+    {
+        UriqaRepoHandler.sharedInstance = sharedInstance;
+    }
+
+    /**
+     * @return the base
+     */
+    private static final Model getBase()
+    {
+        return base;
+    }
+
+    /**
+     * @param base the base to set
+     */
+    private static final void setBase(Model base)
+    {
+        UriqaRepoHandler.base = base;
+    }
+
+    /**
+     * @return the model
+     */
+    private static final OntModel getModel()
+    {
+        return model;
+    }
+
+    /**
+     * @param model the model to set
+     */
+    private static final void setModel(OntModel model)
+    {
+        UriqaRepoHandler.model = model;
+    }
+
+    /**
+     * @return the baseURI
+     */
+    private final URI getBaseURI()
+    {
+        return baseURI;
+    }
+
+    /**
+     * @param baseURI the baseURI to set
+     */
+    private final void setBaseURI(URI baseURI)
+    {
+        this.baseURI = baseURI;
+    }
 }
