@@ -10,14 +10,18 @@ import com.hp.hpl.jena.rdf.model.ModelChangedListener;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 
+/**
+ * UriqaModelChangedListener implements {@link ModelChangedListener} <br />
+ * The only implemented event is that of {@link UriqaModelChangedListener#notifyEvent(Model, Object)} <br />
+ * TODO Can I do anything to rectify non-usage of these methods? Not using this. Why? Consider mput. Will have to check
+ * validity here. And then rebind. If notValid, then would have to rollback. But cannot rollback here. Therefore, I'd
+ * have to check for validity there again. Waste of computation.
+ * 
+ * @author venkatesh
+ */
 public class UriqaModelChangedListener implements ModelChangedListener
 {
 
-    /*
-     * TODO Can I do anything to rectify non-usage of these methods? Not using this. Why? Consider mput. Will have to
-     * check validity here. And then rebind. If notValid, then would have to rollback. But cannot rollback here.
-     * Therefore, I'd have to check for validity there again. Waste of computation.
-     */
     public void addedStatement(Statement arg0)
     {
 
@@ -43,6 +47,15 @@ public class UriqaModelChangedListener implements ModelChangedListener
 
     }
 
+    /**
+     * {@inheritDoc} notifyEvent(arg1) in this custom implementation of {@link UriqaModelChangedListener} assumes arg1
+     * to be boolean and accordingly does a model.rebind() or not.
+     * 
+     * @param model Must be an instance of InfModel
+     * @param arg1 Must be boolean
+     * @see com.hp.hpl.jena.rdf.model.ModelChangedListener#notifyEvent(com.hp.hpl.jena.rdf.model.Model,
+     *      java.lang.Object)
+     */
     public void notifyEvent(Model model, Object arg1)
     {
         try {
@@ -52,7 +65,9 @@ public class UriqaModelChangedListener implements ModelChangedListener
                 ((InfModel) model).rebind();
             }
         } catch (ClassCastException e) {
-            // If Not Boolean.
+            /*
+             * If not Boolean.
+             */
         }
     }
 
