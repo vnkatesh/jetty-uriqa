@@ -59,4 +59,49 @@
     	<version>1.3.2</version>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+	<!-- Javadoc plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.7</version>
+      </plugin>
+	<!-- pdf generation plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pdf-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>pdf</id>
+            <phase>site</phase>
+            <goals>
+              <goal>pdf</goal>
+            </goals>
+            <configuration>
+              <siteDirectory>${basedir}/target/site/</siteDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+<!-- SCM configuration for changelog plugin -->
+  <scm>
+    <connection>scm:svn:http://jetty-uriqa.googlecode.com/svn/trunkSecret/</connection>
+    <developerConnection>scm:svn:https://jetty-uriqa.googlecode.com/svn/trunkSecret/</developerConnection>
+    <url>scm:svn:http://jetty-uriqa.googlecode.com/svn/trunkSecret/</url>
+  </scm>
 </project>
+<!--
+Other Maven commands that could be used to general important reports
+mvn javadoc:javadoc
+mvn javadoc:jar
+mvn resources:resources
+mvn changelog:changelog
+mvn changes:changes-report
+mvn jxr:jxr
+mvn ant:ant
+mvn gpg:sign
+mvn pdf:pdf
+-->
