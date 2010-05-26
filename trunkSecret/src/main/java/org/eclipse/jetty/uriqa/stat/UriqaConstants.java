@@ -1,10 +1,12 @@
-package org.eclipse.jetty.uriqa;
+package org.eclipse.jetty.uriqa.stat;
 
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.uriqa.UriqaHandler;
+import org.eclipse.jetty.uriqa.UriqaRepoHandler;
 
 import com.hp.hpl.jena.rdf.model.InfModel;
 import com.hp.hpl.jena.rdf.model.Model;

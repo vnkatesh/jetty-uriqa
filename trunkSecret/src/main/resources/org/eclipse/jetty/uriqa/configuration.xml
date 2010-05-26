@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+Configuration file.
+@author venkatesh
+-->
+<config>
+<!-- #BaseURI that has to be set according to hostname. -->
+  <URIQA_baseURI>http://localhost</URIQA_baseURI>
+<!-- #TDB based Models would be stored at {$URIQA_dbDirectory}/UriqaDB_<hash> -->
+  <URIQA_dbDirectory>/home/venkatesh/</URIQA_dbDirectory>
+
+<!-- #Headers required for Format: text/html -->
+  <URIQA_DOCTYPE_PUBLIC>-//W3C//DTD XHTML+RDFa 1.0//EN</URIQA_DOCTYPE_PUBLIC>
+  <URIQA_DOCTYPE_SYSTEM>http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd</URIQA_DOCTYPE_SYSTEM>
+  <URIQA_ENCODING>UTF8</URIQA_ENCODING>
+
+<!-- #Custom Error Message -->
+  <URIQA_readerErrorMesage>Reader not closed</URIQA_readerErrorMesage>
+<!-- #Use File-based TDB Model -->
+  <URIQA_TDB>false</URIQA_TDB>
+<!-- #Load Initial repository? -->
+  <URIQA_LOAD>true</URIQA_LOAD>
+<!-- #If URIQA_LOAD=true AND model.isEmpty(), then which file to load? -->
+  <URIQA_INITIAL_REPO>org/eclipse/jetty/uriqa/w3.rdf</URIQA_INITIAL_REPO>
+<!-- #Log.isDebugEnabled() is set by URIQA_DEBUG -->
+  <URIQA_DEBUG>true</URIQA_DEBUG>
+<!-- #Uriqa Ont Model reasoner specifications. -->
+  <URIQA_ONT_MODEL_SPEC>OWL_MEM_MINI_RULE_INF</URIQA_ONT_MODEL_SPEC>
+</config>

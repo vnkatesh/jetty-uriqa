@@ -11,6 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.uriqa.stat.UriqaConfig;
+import org.eclipse.jetty.uriqa.stat.UriqaConstants;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
@@ -29,18 +31,40 @@ public class UriqaHandler extends AbstractHandler
     private String baseURI = null;
 
     /**
+     * The {@link UriqaConfig} configuration stored and used by {@link UriqaRepoHandler}.
+     */
+    private static UriqaConfig config = null;
+
+    /**
      * Parameter Map from {@link Request} headers.
      */
     HashMap<String, String> paramMap = new HashMap<String, String>(3);
 
     /**
      * Constructor. Sets default {@link UriqaHandler#paramMap} values.
+     * 
+     * @param config
      */
-    public UriqaHandler()
+    public UriqaHandler(UriqaConfig config)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("UriqaHandler(config): " + ((config == null) ? "null" : config.toString()));
+        if (config != null)
+            UriqaHandler.config = config;
         paramMap.put(UriqaConstants.Parameters.FORMAT, UriqaConstants.Lang.RDFXML);
         paramMap.put(UriqaConstants.Parameters.NAMING, UriqaConstants.Values.LABEL);
         paramMap.put(UriqaConstants.Parameters.INFERENCE, UriqaConstants.Values.EXC);
+    }
+
+    /**
+     * The constuctor if {@link UriqaConfig} is not available. Calls {@link UriqaHandler#UriqaHandler(UriqaConfig)} with
+     * null parameter.
+     */
+    public UriqaHandler()
+    {
+        this(null);
+        if (Log.isDebugEnabled())
+            Log.debug("UriqaHandler()");
     }
 
     /**
@@ -64,7 +88,7 @@ public class UriqaHandler extends AbstractHandler
          */
         if (baseURI == null) {
             baseURI = baseRequest.getScheme() + "://" + baseRequest.getServerName();
-            UriqaRepoHandler.getDefault(baseURI);
+            UriqaRepoHandler.getDefault(baseURI, config);
             if (Log.isDebugEnabled())
                 Log.debug("handle():baseURI:: " + baseURI);
         }

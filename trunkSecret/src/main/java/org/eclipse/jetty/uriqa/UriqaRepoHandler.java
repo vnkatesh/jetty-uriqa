@@ -45,7 +45,10 @@ import javax.xml.transform.stream.StreamResult;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Response;
-import org.eclipse.jetty.uriqa.UriqaConstants.Methods;
+import org.eclipse.jetty.uriqa.stat.Messages;
+import org.eclipse.jetty.uriqa.stat.UriqaConfig;
+import org.eclipse.jetty.uriqa.stat.UriqaConstants;
+import org.eclipse.jetty.uriqa.stat.UriqaConstants.Methods;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.xml.sax.InputSource;
@@ -123,20 +126,37 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
     private URI baseURI = null;
 
     /**
+     * The {@link UriqaConfig} to be used by {@link UriqaRepoHandler}. Static, and set from either messages.properties
+     * or configuration.xml
+     */
+    private static UriqaConfig config = null;
+
+    /**
      * Constructor. Should be called only once.
      * 
      * @param baseURI The value of {@link UriqaRepoHandler#baseURI} to be set. If null, then
      *            {@link Messages#getString(String)} is used to set it via URIQA_baseURI key.
+     * @param configuration The configuration file (maybe null) that is set as {@link UriqaRepoHandler}'s configuration.
      */
-    public UriqaRepoHandler(String baseURI)
+    public UriqaRepoHandler(String baseURI, UriqaConfig configuration)
     {
         if (Log.isDebugEnabled())
-            Log.debug("UriqaRepoHandler():baseURI:: " + baseURI);
+            Log.debug("UriqaRepoHandler():baseURI,configuration:: " + baseURI + ","
+                + ((configuration == null) ? "null" : configuration.toString()));
+        if (configuration != null) {
+            if (Log.isDebugEnabled())
+                Log.debug("UriqaRepoHandler(): configuration is not null");
+            setConfig(configuration);
+        } else {
+            if (Log.isDebugEnabled())
+                Log.debug("UriqaRepoHandler(): configuration is null");
+            setConfig(new UriqaConfig(Messages.getMap()));
+        }
         try {
             if (baseURI != null)
                 this.baseURI = new URI(baseURI);
             else
-                this.baseURI = new URI(Messages.getString("URIQA_baseURI"));
+                this.baseURI = new URI(config.getURIQA_baseURI());
             if (Log.isDebugEnabled())
                 Log.debug("UriqaRepoHandler():baseURI:: " + this.baseURI.toString());
         } catch (URISyntaxException e) {
@@ -163,7 +183,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
     {
         if (Log.isDebugEnabled())
             Log.debug("getDefault(): null");
-        return getDefault(null);
+        return getDefault(null, null);
     }
 
     /**
@@ -173,7 +193,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      * @param baseURI
      * @return Shared static instance of {@link UriqaRepoHandler}
      */
-    public synchronized static UriqaRepoHandler getDefault(String baseURI)
+    public synchronized static UriqaRepoHandler getDefault(String baseURI, UriqaConfig config)
     {
         if (Log.isDebugEnabled())
             Log.debug("getDefault(): baseURI " + baseURI);
@@ -182,7 +202,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                 /*
                  * To be intialized
                  */
-                sharedInstance = new UriqaRepoHandler(baseURI);
+                sharedInstance = new UriqaRepoHandler(baseURI, config);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -207,7 +227,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         /*
          * In-Memory Model or TDB Model.
          */
-        if (!(new Boolean(Messages.getString("URIQA_TDB"))).booleanValue())
+        if (!config.isURIQA_TDB())
             this.initializeRepo();
         else
             this.initializeRepo(System.getProperty("user.dir").toString().hashCode());
@@ -239,24 +259,24 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  */
                 model.enterCriticalSection(Lock.WRITE);
                 try {
-                    model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")));
+                    model = ModelFactory.createOntologyModel(getReasoner(config.getURIQA_ONT_MODEL_SPEC()));
                 } finally {
                     model.leaveCriticalSection();
                 }
             } else
-                model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")));
+                model = ModelFactory.createOntologyModel(getReasoner(config.getURIQA_ONT_MODEL_SPEC()));
         } else {
             /*
              * TDB Based Model. Unique DBdirectory value is using concatenated URIQA_dbDirectory in messages.properties
              * and hash-value.
              */
-            String DBdirectory = Messages.getString("URIQA_dbDirectory") + "UriqaDB_" + Integer.toString(hash);
+            String DBdirectory = config.getURIQA_dbDirectory() + "UriqaDB_" + Integer.toString(hash);
             base = TDBFactory.createModel(DBdirectory);
-            model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")), base);
+            model = ModelFactory.createOntologyModel(getReasoner(config.getURIQA_ONT_MODEL_SPEC()), base);
             if (Log.isDebugEnabled())
                 Log.debug("initializeRepo(): TDB Model at " + DBdirectory);
-            if ((new Boolean(Messages.getString("URIQA_DEBUG"))).booleanValue()) {
-                // check.
+            if (config.isURIQA_DEBUG()) {
+                // TODO check.
                 TDB.setExecutionLogging(Explain.InfoLevel.ALL);
                 TDB.getContext().set(TDB.symLogExec, Explain.InfoLevel.ALL);
             }
@@ -274,11 +294,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
          * Load an Initial Repository if model is Empty and URIQA_LOAD in messages.properties is true The Model to be
          * loaded from file is specified by URIQA_INITIAL_REPO in messages.properties.
          */
-        if (model.isEmpty() && (new Boolean(Messages.getString("URIQA_LOAD"))).booleanValue()) {
-            model.add(FileManager.get().loadModel(Messages.getString("URIQA_INITIAL_REPO")));
+        if (model.isEmpty() && config.isURIQA_LOAD()) {
+            model.add(FileManager.get().loadModel(config.getURIQA_INITIAL_REPO()));
             if (Log.isDebugEnabled())
-                Log.debug("initializeRepo(): FileManager.loadModel from file: "
-                    + Messages.getString("URIQA_INITIAL_REPO"));
+                Log.debug("initializeRepo(): FileManager.loadModel from file: " + config.getURIQA_INITIAL_REPO());
         }
         // TODO Prefix j.1 has to be removed. for further compatibility with CBD.
         /*
@@ -661,7 +680,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
 
         reader.close();
         if (reader.read() >= 0)
-            throw new IllegalStateException(Messages.getString("URIQA_readerErrorMesage"));
+            throw new IllegalStateException(config.getURIQA_readerErrorMesage());
 
         /*
          * Flushing all outputs, setting response-headers, closing streams.
@@ -722,7 +741,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
          */
         reader.close();
         if (reader.read() >= 0)
-            throw new IllegalStateException(Messages.getString("URIQA_readerErrorMesage"));
+            throw new IllegalStateException(config.getURIQA_readerErrorMesage());
 
         if (Log.isDebugEnabled())
             Log.debug("doQuery:queryString:: " + queryString);
@@ -1139,7 +1158,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         ByteArrayOutputStream o = new ByteArrayOutputStream();
         data.write(o, UriqaConstants.Lang.RDFXML);
         o.flush();
-        String rdfxml = o.toString(Messages.getString("URIQA_ENCODING"));
+        String rdfxml = o.toString(config.getURIQA_ENCODING());
         iSource = new InputSource(new StringReader(rdfxml));
 
         /*
@@ -1156,9 +1175,9 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         TransformerFactory tFactory = TransformerFactory.newInstance();
         Transformer transformer = tFactory.newTransformer();
         transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
-        transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, Messages.getString("URIQA_DOCTYPE_PUBLIC"));
-        transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, Messages.getString("URIQA_DOCTYPE_SYSTEM"));
-        transformer.setOutputProperty(OutputKeys.ENCODING, Messages.getString("URIQA_ENCODING"));
+        transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, config.getURIQA_DOCTYPE_PUBLIC());
+        transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, config.getURIQA_DOCTYPE_SYSTEM());
+        transformer.setOutputProperty(OutputKeys.ENCODING, config.getURIQA_ENCODING());
 
         /*
          * Tranform using Transformer.transformer() method with the SAXParser (xmlReader), InputSource from above to
@@ -1592,6 +1611,26 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         if (Log.isDebugEnabled())
             Log.debug("getReasoner(type) :" + type);
         return OntModelSpecAssembler.getOntModelSpecField(type);
+    }
+
+    /**
+     * @param config the config to set
+     */
+    public static void setConfig(UriqaConfig config)
+    {
+        if (Log.isDebugEnabled())
+            Log.debug("setConfig(config): " + config.toString());
+        UriqaRepoHandler.config = config;
+    }
+
+    /**
+     * @return the config
+     */
+    public static UriqaConfig getConfig()
+    {
+        if (Log.isDebugEnabled())
+            Log.debug("getConfig()");
+        return config;
     }
 
 }

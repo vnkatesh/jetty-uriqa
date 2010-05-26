@@ -1,8 +1,10 @@
-package org.eclipse.jetty.uriqa;
+package org.eclipse.jetty.uriqa.stat;
 
 import java.util.HashMap;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+
+import org.eclipse.jetty.util.log.Log;
 
 /**
  * See also: {@link Messages#getString(String)}
@@ -16,10 +18,13 @@ public class Messages
     /**
      * The key-value configuration file path.
      */
-    private static final String BUNDLE_NAME = "org.eclipse.jetty.uriqa.messages"; //$NON-NLS-1$
+    private static final String BUNDLE_NAME = "org.eclipse.jetty.uriqa.stat.messages"; //$NON-NLS-1$
 
     private static final ResourceBundle RESOURCE_BUNDLE = ResourceBundle.getBundle(BUNDLE_NAME);
 
+    /**
+     * Blank constructor
+     */
     private Messages()
     {
     }
@@ -32,6 +37,8 @@ public class Messages
      */
     public static String getString(String key)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getString(key): " + key);
         try {
             return RESOURCE_BUNDLE.getString(key);
         } catch (MissingResourceException e) {
@@ -46,6 +53,8 @@ public class Messages
      */
     public static HashMap<String, String> getMap()
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getMap()");
         return new HashMap<String, String>()
         {
             {
