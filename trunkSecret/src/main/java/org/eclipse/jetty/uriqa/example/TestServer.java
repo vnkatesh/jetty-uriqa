@@ -1,6 +1,8 @@
-package org.eclipse.jetty.uriqa;
+package org.eclipse.jetty.uriqa.example;
 
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.uriqa.Messages;
+import org.eclipse.jetty.uriqa.UriqaHandler;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.StdErrLog;
 

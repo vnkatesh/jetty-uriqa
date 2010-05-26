@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -51,12 +53,14 @@ import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
 import com.hp.hpl.jena.Jena;
+import com.hp.hpl.jena.assembler.assemblers.OntModelSpecAssembler;
 import com.hp.hpl.jena.ontology.OntModel;
 import com.hp.hpl.jena.ontology.OntModelSpec;
 import com.hp.hpl.jena.query.Query;
 import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QueryFactory;
+import com.hp.hpl.jena.query.QueryParseException;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.query.ResultSetFormatter;
 import com.hp.hpl.jena.rdf.model.InfModel;
@@ -77,6 +81,7 @@ import com.hp.hpl.jena.shared.ReificationStyle;
 import com.hp.hpl.jena.shared.impl.PrefixMappingImpl;
 import com.hp.hpl.jena.tdb.TDB;
 import com.hp.hpl.jena.tdb.TDBFactory;
+import com.hp.hpl.jena.tdb.solver.Explain;
 import com.hp.hpl.jena.update.UpdateAction;
 import com.hp.hpl.jena.util.FileManager;
 
@@ -220,7 +225,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private void initializeRepo(int hash)
     {
-        // TODO Reasoner to be exported out to URIQA_message.properties remove OntModelSpec.
         if (Log.isDebugEnabled())
             Log.debug("initializeRepo(): hash " + hash);
         if (hash == 0) {
@@ -235,12 +239,12 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  */
                 model.enterCriticalSection(Lock.WRITE);
                 try {
-                    model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF);
+                    model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")));
                 } finally {
                     model.leaveCriticalSection();
                 }
             } else
-                model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF);
+                model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")));
         } else {
             /*
              * TDB Based Model. Unique DBdirectory value is using concatenated URIQA_dbDirectory in messages.properties
@@ -248,9 +252,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
              */
             String DBdirectory = Messages.getString("URIQA_dbDirectory") + "UriqaDB_" + Integer.toString(hash);
             base = TDBFactory.createModel(DBdirectory);
-            model = ModelFactory.createOntologyModel(OntModelSpec.OWL_MEM_MINI_RULE_INF, base);
+            model = ModelFactory.createOntologyModel(getReasoner(Messages.getString("URIQA_ONT_MODEL_SPEC")), base);
             if (Log.isDebugEnabled())
                 Log.debug("initializeRepo(): TDB Model at " + DBdirectory);
+            if ((new Boolean(Messages.getString("URIQA_DEBUG"))).booleanValue()) {
+                // check.
+                TDB.setExecutionLogging(Explain.InfoLevel.ALL);
+                TDB.getContext().set(TDB.symLogExec, Explain.InfoLevel.ALL);
+            }
         }
         model.prepare();
         /*
@@ -384,7 +393,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         /*
          * baseURIpath is the URI of the resource to be MGET/MDELETE etc and is calculated here.
          */
-        // TODO remove baseURIpath from MPUT, all the doesntmatter calls.
         String baseURIpath =
             baseURI.toString()
                 + (request.getPathInfo().startsWith("/") ? request.getPathInfo() : "/" + request.getPathInfo());
@@ -395,22 +403,31 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  */
                 doGet(baseURIpath, response, paramMap);
             } catch (IOException e1) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 e1.printStackTrace();
             } catch (TransformerException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (SAXException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (ParserConfigurationException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (IllegalArgumentException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (SecurityException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (IllegalAccessException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (InvocationTargetException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             } catch (NoSuchMethodException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             }
         }
@@ -421,6 +438,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  */
                 doPut(baseURI.toString(), request, paramMap, response);
             } catch (IOException e) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 e.printStackTrace();
             }
         }
@@ -436,28 +454,33 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  */
                 doDerive(request, response);
             } catch (IOException e1) {
+                response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
                 e1.printStackTrace();
             }
         }
         if (method.equals(UriqaConstants.Methods.MQUERY)) {
             try {
-                try {
-                    /*
-                     * MQUERY Method
-                     */
-                    doQuery(request, response, paramMap);
-                } catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                } catch (SecurityException e) {
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
-                    e.printStackTrace();
-                } catch (NoSuchMethodException e) {
-                    e.printStackTrace();
-                }
+                /*
+                 * MQUERY Method
+                 */
+                doQuery(request, response, paramMap);
             } catch (IOException e) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                e.printStackTrace();
+            } catch (IllegalArgumentException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                e.printStackTrace();
+            } catch (SecurityException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                e.printStackTrace();
+            } catch (InvocationTargetException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                e.printStackTrace();
+            } catch (NoSuchMethodException e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 e.printStackTrace();
             }
         }
@@ -494,7 +517,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
              * real Line and save it.
              */
             queryString += line;
-            // TODO Create some actual parser maybe?
             // TODO Does not close properly. Just checked with others also. Same behaviour. Is that normal??
             /*
              * Line starts with PREFIX. Store values in PrefixMappingImpl
@@ -619,6 +641,22 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
             queryString += "\n";
             if (Log.isDebugEnabled())
                 Log.debug("doDerive():queryString:: " + queryString);
+        }
+
+        Pattern pattern =
+            Pattern.compile(
+                "[PREFIX\t[a-zA-Z0-9]*:\t<.*>[\r]?\n]*.*[[\r]?\n]*TRACE[\r]?\n[[[a-zA-Z0-9]*:.*[\t\n]]{3}]*[\r]?\n",
+                Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(queryString);
+        // TODO Create some actual parser.
+        if (!matcher.matches()) {
+            if (Log.isDebugEnabled())
+                Log.debug("UriqaQueryParseException");
+            out.close();
+            bytearray.close();
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getOutputStream().close();
+            throw new QueryParseException("UriqaQueryParseException", 0, 0);
         }
 
         reader.close();
@@ -936,7 +974,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
     {
         if (Log.isDebugEnabled())
             Log.debug("contentLengthPrint():response,method,arguments,out:: " + response.toString() + "," + method
-                + "," + arguments.toString() + ", " + out.toString());
+                + "," + arguments.toString() + (out == null ? "" : ", " + out.toString()));
         if (Log.isDebugEnabled())
             Log.debug("contentLengthPrint():method:: " + method.getName());
         /*
@@ -1317,9 +1355,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                 model.notifyEvent(true);
             }
         } catch (IOException e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             e.printStackTrace();
         } catch (JenaException e) {
-            // TODO Premature end of file: response code something else.
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         } finally {
             model.leaveCriticalSection();
         }
@@ -1476,6 +1515,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final UriqaRepoHandler getSharedInstance()
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getSharedInstance()");
         return sharedInstance;
     }
 
@@ -1484,6 +1525,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final void setSharedInstance(UriqaRepoHandler sharedInstance)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("setSharedInstance(sharedInstance): " + sharedInstance.toString());
         UriqaRepoHandler.sharedInstance = sharedInstance;
     }
 
@@ -1492,6 +1535,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final Model getBase()
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getBase");
         return base;
     }
 
@@ -1500,6 +1545,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final void setBase(Model base)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("setBase(base): " + base.toString());
         UriqaRepoHandler.base = base;
     }
 
@@ -1508,6 +1555,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final OntModel getModel()
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getModel()");
         return model;
     }
 
@@ -1516,6 +1565,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private static final void setModel(OntModel model)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("setModel(model): " + model.toString());
         UriqaRepoHandler.model = model;
     }
 
@@ -1524,6 +1575,8 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private final URI getBaseURI()
     {
+        if (Log.isDebugEnabled())
+            Log.debug("getBaseURI()");
         return baseURI;
     }
 
@@ -1532,6 +1585,23 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
      */
     private final void setBaseURI(URI baseURI)
     {
+        if (Log.isDebugEnabled())
+            Log.debug("setBaseURI(baseURI): " + baseURI.toString());
         this.baseURI = baseURI;
     }
+
+    /**
+     * Returns the OntModel Specification for creating Ontology Model according to the argument type, which is defined
+     * in OntModelSpec
+     * 
+     * @param type The OntModelSpec.type to be retrieved.
+     * @return OntModelSpec required to create the Ontology Model
+     */
+    private final OntModelSpec getReasoner(String type)
+    {
+        if (Log.isDebugEnabled())
+            Log.debug("getReasoner(type) :" + type);
+        return OntModelSpecAssembler.getOntModelSpecField(type);
+    }
+
 }
