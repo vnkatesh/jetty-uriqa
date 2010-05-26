@@ -140,7 +140,7 @@ public class UriqaHandler extends AbstractHandler
             ((Request) request).setHandled(true);
             baseRequest.setHandled(true);
             if (Log.isDebugEnabled())
-                Log.debug("handle():setHanlded()");
+                Log.debug("handle():setHandled()");
         }
     }
 }

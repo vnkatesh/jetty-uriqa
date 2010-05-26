@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -72,6 +73,7 @@ import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.RSIterator;
+import com.hp.hpl.jena.rdf.model.ReifiedStatement;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
@@ -1030,10 +1032,14 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         /*
          * Setting content-length header.
          */
+        out.flush();
         response.setContentLength(out.toByteArray().length);
         response.getOutputStream().write(out.toByteArray());
         if (Log.isDebugEnabled())
             Log.debug("contentPrintLength: output:\r\n " + out.toString());
+        out.close();
+        response.getOutputStream().flush();
+        response.getOutputStream().close();
     }
 
     /**
@@ -1214,21 +1220,23 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
             /*
              * Getting the statements that that have the resource as Subject.
              */
-            StmtIterator iter = data.listStatements(r, null, (RDFNode) null);
+            StmtIterator iter_stmt = data.listStatements(r, null, (RDFNode) null);
+            List<Statement> stmtList = iter_stmt.toList();
             if (Log.isDebugEnabled())
-                Log.debug("getCBD():Number of statments: " + iter.toList().size());
+                Log.debug("getCBD():Number of statments: " + stmtList.size());
+            Iterator<Statement> iter = stmtList.iterator();
             /*
              * CBD requires Reified statements to be shown too. Creating tempmodel.
              */
             Model tempmodel = ModelFactory.createDefaultModel(ReificationStyle.Minimal);
             while (iter.hasNext()) {
-                Statement stmt = iter.nextStatement();
+                Statement stmt = iter.next();
                 /*
                  * Adding the statement to the tempmodel.
                  */
                 tempmodel.add(stmt);
                 if (Log.isDebugEnabled())
-                    Log.debug("getCBD():addStatment: " + stmt.getResource().getURI() + "->"
+                    Log.debug("getCBD():addStatment: " + stmt.getSubject().getURI() + "->"
                         + stmt.getPredicate().getURI() + "->" + stmt.getObject().toString());
                 if (stmt.getObject().isAnon()) {
                     /*
@@ -1243,17 +1251,19 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                 /*
                  * Checking for reified statements in parent model.
                  */
-                RSIterator iter2 = data.listReifiedStatements(stmt);
+                RSIterator iter2_rs = data.listReifiedStatements(stmt);
+                List<ReifiedStatement> rsList = iter2_rs.toList();
                 if (Log.isDebugEnabled())
-                    Log.debug("getCBD():Number of reified: " + iter2.toList().size());
+                    Log.debug("getCBD():Number of reified: " + rsList.size());
+                Iterator<ReifiedStatement> iter2 = rsList.iterator();
                 while (iter2.hasNext()) {
-                    Statement stmt2 = iter2.nextRS().getStatement();
+                    Statement stmt2 = iter2.next().getStatement();
                     /*
                      * Adding the reified statement to tempModel.
                      */
                     tempmodel.createReifiedStatement(stmt2);
                     if (Log.isDebugEnabled())
-                        Log.debug("getCBD():addStatment: " + stmt2.getResource().getURI() + "->"
+                        Log.debug("getCBD():addStatment: " + stmt2.getSubject().getURI() + "->"
                             + stmt2.getPredicate().getURI() + "->" + stmt2.getObject().toString());
                 }
             }
@@ -1281,21 +1291,23 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
             /*
              * Getting the statements that that have the resource as Subject.
              */
-            StmtIterator iter = data.listStatements(r, null, (RDFNode) null);
+            StmtIterator iter_stmt = data.listStatements(r, null, (RDFNode) null);
+            List<Statement> stmtList = iter_stmt.toList();
             if (Log.isDebugEnabled())
-                Log.debug("getClean():Number of statments: " + iter.toList().size());
+                Log.debug("getClean():Number of statments: " + stmtList.size());
+            Iterator<Statement> iter = stmtList.iterator();
             /*
              * Creating cleanmodel.
              */
             Model cleanModel = ModelFactory.createDefaultModel();
             while (iter.hasNext()) {
-                Statement stmt = iter.nextStatement();
+                Statement stmt = iter.next();
                 /*
                  * Adding the statement to the cleanmodel.
                  */
                 cleanModel.add(stmt);
                 if (Log.isDebugEnabled())
-                    Log.debug("getClean():addStatment: " + stmt.getResource().getURI() + "->"
+                    Log.debug("getClean():addStatment: " + stmt.getSubject().getURI() + "->"
                         + stmt.getPredicate().getURI() + "->" + stmt.getObject().toString());
                 if (stmt.getObject().isAnon()) {
                     cleanModel.add(getClean((Resource) stmt.getObject(), data));

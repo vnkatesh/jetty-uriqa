@@ -17,7 +17,7 @@ Configuration file.
 <!-- #Custom Error Message -->
   <URIQA_readerErrorMesage>Reader not closed</URIQA_readerErrorMesage>
 <!-- #Use File-based TDB Model -->
-  <URIQA_TDB>false</URIQA_TDB>
+  <URIQA_TDB>true</URIQA_TDB>
 <!-- #Load Initial repository? -->
   <URIQA_LOAD>true</URIQA_LOAD>
 <!-- #If URIQA_LOAD=true AND model.isEmpty(), then which file to load? -->
