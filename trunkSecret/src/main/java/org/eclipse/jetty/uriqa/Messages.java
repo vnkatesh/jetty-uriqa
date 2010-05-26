@@ -1,5 +1,6 @@
 package org.eclipse.jetty.uriqa;
 
+import java.util.HashMap;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -36,5 +37,21 @@ public class Messages
         } catch (MissingResourceException e) {
             return '!' + key + '!';
         }
+    }
+
+    /**
+     * Returns the hashmap of values from the resource-bundle.
+     * 
+     * @return Hashmap of values from the messages.properties file
+     */
+    public static HashMap<String, String> getMap()
+    {
+        return new HashMap<String, String>()
+        {
+            {
+                for (String key : RESOURCE_BUNDLE.keySet())
+                    put(key, RESOURCE_BUNDLE.getString(key));
+            }
+        };
     }
 }

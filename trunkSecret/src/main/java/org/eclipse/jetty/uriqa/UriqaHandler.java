@@ -71,7 +71,6 @@ public class UriqaHandler extends AbstractHandler
 
         if (Log.isDebugEnabled())
             Log.debug("****************Handler***************");
-        // TODO use UriqaMethods ENUM Matching. Better DS required probably.
 
         /*
          * Set paramMap values for corresponding headers if present.
@@ -112,11 +111,7 @@ public class UriqaHandler extends AbstractHandler
         /*
          * Set the request as handled if the method is one of MGET/MPUT/MDELETE/MQUERY/MTRACE
          */
-        if (baseRequest.getMethod().equals(UriqaConstants.Methods.MGET)
-            || baseRequest.getMethod().equals(UriqaConstants.Methods.MPUT)
-            || baseRequest.getMethod().equals(UriqaConstants.Methods.MDELETE)
-            || baseRequest.getMethod().equals(UriqaConstants.Methods.MQUERY)
-            || baseRequest.getMethod().equals(UriqaConstants.Methods.MTRACE)) {
+        if (UriqaConstants.Methods.map.containsValue(baseRequest.getMethod())) {
 
             ((Request) request).setHandled(true);
             baseRequest.setHandled(true);

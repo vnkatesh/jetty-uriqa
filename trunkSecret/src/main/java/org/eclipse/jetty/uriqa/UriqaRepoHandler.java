@@ -727,14 +727,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
         if (Log.isDebugEnabled())
             Log.debug("doQuery:queryString:: " + queryString);
 
-        // TODO Any other efficient way to compare them?
-        if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.DELETE)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.LOAD)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.CLEAR)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.DROP)
-            || queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
+        if (UriqaConstants.Query.UpdateActionQueries.containsValue(queryString.toUpperCase())) {
 
             /*
              * Update-Queries, therefore Lock.Write
@@ -745,10 +738,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  * Inference boolean parameter
                  */
                 boolean inference = paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC);
-                if (queryString.toUpperCase().contains(UriqaConstants.Query.INSERT)
-                    || queryString.toUpperCase().contains(UriqaConstants.Query.MODIFY)
-                    || queryString.toUpperCase().contains(UriqaConstants.Query.LOAD)
-                    || queryString.toUpperCase().contains(UriqaConstants.Query.CREATE)) {
+                if (UriqaConstants.Query.rebindModelUpdateActionQueries.containsValue(queryString.toUpperCase())) {
                     /*
                      * Those update-queries that insert data into the model. They need to be validated before actual
                      * commit(). Since model.supportTransaction() is false (true only for SDB), I've used tempmodel to

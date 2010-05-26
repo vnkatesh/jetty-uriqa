@@ -1,9 +1,12 @@
 package org.eclipse.jetty.uriqa;
 
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jetty.server.Request;
 
+import com.hp.hpl.jena.rdf.model.InfModel;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.update.UpdateAction;
 
@@ -40,10 +43,28 @@ public class UriqaConstants
      * 
      * @version $Id$
      */
-    public class Methods
+    public static class Methods
     {
         public final static String MGET = "MGET", MPUT = "MPUT", MDELETE = "MDELETE", MQUERY = "MQUERY",
             MTRACE = "MTRACE";
+
+        /**
+         * This Map makes is easier/efficient while doing a compare for Methods.
+         * 
+         * @see UriqaHandler#handle(String, Request, javax.servlet.http.HttpServletRequest,
+         *      javax.servlet.http.HttpServletResponse) where {@link Methods#map}'s {@link Map#containsValue(Object)} is
+         *      being used.
+         */
+        public final static HashMap<String, String> map = new HashMap<String, String>(5)
+        {
+            {
+                put("MGET", MGET);
+                put("MPUT", MPUT);
+                put("MDELETE", MDELETE);
+                put("MQUERY", MQUERY);
+                put("MTRACE", MTRACE);
+            }
+        };
     }
 
     /**
@@ -73,11 +94,63 @@ public class UriqaConstants
      * 
      * @version $Id$
      */
-    public class Query
+    public static class Query
     {
         public final static String INSERT = "INSERT", MODIFY = "MODIFY", DELETE = "DELETE", SELECT = "SELECT",
             ASK = "ASK", CONSTRUCT = "CONSTRUCT", DESCRIBE = "DESCRIBE", LOAD = "LOAD", CLEAR = "CLEAR", DROP = "DROP",
             CREATE = "CREATE";
+
+        /**
+         * Hashmap of all the possible query types.
+         */
+        public final static HashMap<String, String> map = new HashMap<String, String>(11)
+        {
+            {
+                put("INSERT", INSERT);
+                put("MODIFY", MODIFY);
+                put("DELETE", DELETE);
+                put("SELECT", SELECT);
+                put("ASK", ASK);
+                put("CONSTRUCT", CONSTRUCT);
+                put("DESCRIBE", DESCRIBE);
+                put("LOAD", LOAD);
+                put("CLEAR", CLEAR);
+                put("DROP", DROP);
+                put("CREATE", CREATE);
+            }
+        };
+
+        /**
+         * This Map makes is easier/efficient while doing a compare for Query types. This map contains all queries that
+         * require {@link UpdateAction} Method to execute it. Check
+         * {@link UriqaRepoHandler#doQuery(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse, HashMap)}
+         * where {@link Map#containsValue(Object)} is being used for efficient comparison.
+         */
+        public final static HashMap<String, String> UpdateActionQueries = new HashMap<String, String>(11)
+        {
+            {
+                putAll(map);
+                remove(ASK);
+                remove(SELECT);
+                remove(CONSTRUCT);
+                remove(DESCRIBE);
+            }
+        };
+
+        /**
+         * Those queries which can be executed using only {@link UpdateAction} and do some sort of insertion/updation
+         * (but NOT deletion/removal) from the model and therefore require {@link InfModel#rebind()} to be called later
+         * upon.
+         */
+        public final static HashMap<String, String> rebindModelUpdateActionQueries = new HashMap<String, String>(11)
+        {
+            {
+                put("INSERT", INSERT);
+                put("MODIFY", MODIFY);
+                put("LOAD", LOAD);
+                put("CREATE", CREATE);
+            }
+        };
     }
 
 }
