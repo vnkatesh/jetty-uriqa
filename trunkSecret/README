@@ -1,0 +1,6 @@
+HOW TO RUN
+==========================================
+svn co svn checkout http://jetty-uriqa.googlecode.com/svn/trunkSecret/ jetty-uriqa
+cd jetty-uriqa
+mvn install
+mvn exec:java

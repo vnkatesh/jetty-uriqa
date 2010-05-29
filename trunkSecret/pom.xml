@@ -67,6 +67,18 @@
   </dependencies>
   <build>
     <plugins>
+<plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <configuration>
+          <!-- <includeProjectDependencies>true</includeProjectDependencies> -->
+          <includePluginDependencies>true</includePluginDependencies>
+          <mainClass>org.eclipse.jetty.uriqa.example.TestServer</mainClass>
+	 <cleanupDaemonThreads>true</cleanupDaemonThreads> 
+	  <daemonThreadJoinTimeout>0</daemonThreadJoinTimeout>
+	  <keepAlive>true</keepAlive>
+        </configuration>
+      </plugin>
 	<!-- Javadoc plugin -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -278,7 +278,6 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
             if (Log.isDebugEnabled())
                 Log.debug("initializeRepo(): TDB Model at " + DBdirectory);
             if (config.isURIQA_DEBUG()) {
-                // TODO check.
                 TDB.setExecutionLogging(Explain.InfoLevel.ALL);
                 TDB.getContext().set(TDB.symLogExec, Explain.InfoLevel.ALL);
             }
