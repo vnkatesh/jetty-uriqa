@@ -48,6 +48,8 @@ public class TestMQuery
             wr.write("Host: localhost:8080\r\n");
             wr.write("Content-Length: " + query.length() + "\r\n");
             wr.write("Content-Type: text/xml; charset=\"utf-8\"\r\n");
+            // TODO inferencing is creating problems?? INFERENCING KILLS!! MAJOR BUG!!
+            // wr.write("inference: include\r\n");
             wr.write("format: text/json\r\n");
             wr.write("\r\n");
 

@@ -1,3 +1,19 @@
+/*
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this software; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ */
 package org.eclipse.jetty.uriqa;
 
 import java.io.IOException;
@@ -25,10 +41,15 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 public class UriqaHandler extends AbstractHandler
 {
 
+    /*
+     * TODO Change license to something appropriate. And apply to all source files. TODO Check for new java docs to be
+     * added and log.debugs to be added from june 13th commit onwards
+     */
+
     /**
      * baseURI to be set at {@link UriqaRepoHandler}
      */
-    private String baseURI = null;
+    private static String baseURI = null;
 
     /**
      * The {@link UriqaConfig} configuration stored and used by {@link UriqaRepoHandler}.
@@ -51,6 +72,17 @@ public class UriqaHandler extends AbstractHandler
             Log.debug("UriqaHandler(config): " + ((config == null) ? "null" : config.toString()));
         if (config != null)
             UriqaHandler.config = config;
+        setParamMapDefault();
+    }
+
+    /**
+     * Sets the base default parameters. Called with every call of handle()
+     */
+    private void setParamMapDefault()
+    {
+        if (Log.isDebugEnabled())
+            Log.debug("setParamMapDefault()");
+        paramMap.clear();
         paramMap.put(UriqaConstants.Parameters.FORMAT, UriqaConstants.Lang.RDFXML);
         paramMap.put(UriqaConstants.Parameters.NAMING, UriqaConstants.Values.LABEL);
         paramMap.put(UriqaConstants.Parameters.INFERENCE, UriqaConstants.Values.EXC);
@@ -95,6 +127,11 @@ public class UriqaHandler extends AbstractHandler
 
         if (Log.isDebugEnabled())
             Log.debug("****************Handler***************");
+
+        /*
+         * Setting base Parameters.
+         */
+        setParamMapDefault();
 
         /*
          * Set paramMap values for corresponding headers if present.

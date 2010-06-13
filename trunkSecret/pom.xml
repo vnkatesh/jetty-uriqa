@@ -22,13 +22,6 @@
   <!-- List of Dependencies -->
   <dependencies>
     <dependency>
-    <!-- For JUnit Test Cases -->
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
     <!-- Main Class for Jetty-Server -->
     	<groupId>org.eclipse.jetty</groupId>
     	<artifactId>jetty-server</artifactId>
@@ -63,6 +56,12 @@
     	<groupId>com.thoughtworks.xstream</groupId>
     	<artifactId>xstream</artifactId>
     	<version>1.3.1</version>
+    </dependency>
+    <dependency>
+    	<groupId>junit</groupId>
+    	<artifactId>junit</artifactId>
+    	<version>4.8.1</version>
+    	<scope>test</scope>
     </dependency>
   </dependencies>
   <build>

@@ -44,6 +44,7 @@ public class TestMTrace
             wr.write("Host: localhost:8080\r\n");
             wr.write("Content-Length: " + query.length() + "\r\n");
             wr.write("Content-Type: text/xml; charset=\"utf-8\"\r\n");
+            wr.write("Connection: close\r\n");
             wr.write("\r\n");
 
             wr.write(query);

@@ -1,3 +1,19 @@
+/*
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this software; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ */
 package org.eclipse.jetty.uriqa;
 
 import java.io.BufferedInputStream;
@@ -559,13 +575,24 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                 /*
                  * Getting subject, property values
                  */
+                /*
+                 * TAB Character
+                 */
                 String[] q = line.split("	");
                 Resource subject = null;
                 Property property = null;
                 String literal = null;
                 Resource object = null;
                 subject = model.getResource(prefix.getNsPrefixURI(q[0].split(":")[0]) + q[0].split(":")[1]);
-                property = model.getProperty(prefix.getNsPrefixURI(q[1].split(":")[0]) + q[1].split(":")[1]);
+                if (!(q[1].contains("?"))) {
+                    property = model.getProperty(prefix.getNsPrefixURI(q[1].split(":")[0]) + q[1].split(":")[1]);
+                } else {
+                    /*
+                     * Find Hidden Relationship.
+                     */
+                    if (Log.isDebugEnabled())
+                        Log.debug("doDerive():property is '?'");
+                }
                 /*
                  * If 3rd value contains ":" then, is either URI or is prefix:path. Therefore, should be a resource
                  */
@@ -574,6 +601,39 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                 else
                     literal = q[2];
                 if (object != null) {
+                    if (property == null) {
+                        /*
+                         * Find hidden relationship.
+                         */
+                        if (Log.isDebugEnabled())
+                            Log.debug("doDerive(): Find relationship s,null,object");
+                        // TODO Think of multiple statements and how that is being handled.
+                        // TODO Test hidden relationship functionality.
+                        if (model.listStatements(subject, null, object).toList().size() > 0) {
+                            /*
+                             * Exists.
+                             */
+                            if (Log.isDebugEnabled())
+                                Log.debug("doDerive(): 200");
+                            response.setStatus(HttpServletResponse.SC_OK);
+                            for (StmtIterator i = model.listStatements(subject, null, object); i.hasNext();) {
+                                /*
+                                 * Printing the property as the output, and then deriving the relationship later.
+                                 */
+                                Statement s = i.nextStatement();
+                                out.println(s.getPredicate().getURI());
+                            }
+                        } else {
+                            /*
+                             * Not found, set status code, abort.
+                             */
+                            if (Log.isDebugEnabled())
+                                Log.debug("doDerive(): 404");
+                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                            return;
+                        }
+
+                    }
                     /*
                      * Object is set, S,P,O Statement
                      */
@@ -615,6 +675,37 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                         }
                     }
                 } else {
+                    if (property == null) {
+                        /*
+                         * Find hidden relationship.
+                         */
+                        if (Log.isDebugEnabled())
+                            Log.debug("doDerive(): Find relationship s,null,literal");
+                        if (model.listStatements(subject, null, literal).toList().size() > 0) {
+                            /*
+                             * Exists.
+                             */
+                            if (Log.isDebugEnabled())
+                                Log.debug("doDerive(): 200");
+                            response.setStatus(HttpServletResponse.SC_OK);
+                            for (StmtIterator i = model.listStatements(subject, null, literal); i.hasNext();) {
+                                /*
+                                 * Printing the property as the output, and then deriving the relationship later.
+                                 */
+                                Statement s = i.nextStatement();
+                                out.println(s.getPredicate().getURI());
+                            }
+                        } else {
+                            /*
+                             * Not found, set status code, abort.
+                             */
+                            if (Log.isDebugEnabled())
+                                Log.debug("doDerive(): 404");
+                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                            return;
+                        }
+
+                    }
                     /*
                      * Object is null, it is a literal. S,P, L
                      */
@@ -772,10 +863,10 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                     tempmodel.add(model);
                     if (inference) {
                         /*
-                         * Inferred model, using tempmodel.getDeductionsModel() for including inferred statements.
-                         * Executing update-query
+                         * Inferred model, using tempmodel for including inferred statements. NOTE: tempmodel by itself
+                         * is inferred. Executing update-query
                          */
-                        UpdateAction.parseExecute(queryString, tempmodel.getDeductionsModel());
+                        UpdateAction.parseExecute(queryString, tempmodel);
                     } else {
                         /*
                          * Executing update-query for non-inferred model.
@@ -802,7 +893,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                          * There is not error in the validation. Go ahead and perform the actual query in the model.
                          */
                         if (inference) {
-                            UpdateAction.parseExecute(queryString, model.getDeductionsModel());
+                            UpdateAction.parseExecute(queryString, model);
                         } else {
                             UpdateAction.parseExecute(queryString, model.getRawModel());
                         }
@@ -820,7 +911,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                      * The Update-queries that just Delete/DROP data. They do not require to be validated.
                      */
                     if (inference) {
-                        UpdateAction.parseExecute(queryString, model.getDeductionsModel());
+                        UpdateAction.parseExecute(queryString, model);
                     } else {
                         UpdateAction.parseExecute(queryString, model.getRawModel());
                     }
@@ -858,7 +949,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
              * Creating QueryExecution with or without Inference according to Parameter-value.
              */
             if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC)) {
-                qexec = QueryExecutionFactory.create(query, model.getDeductionsModel());
+                qexec = QueryExecutionFactory.create(query, model);
             } else {
                 qexec = QueryExecutionFactory.create(query, model.getRawModel());
             }
@@ -1095,7 +1186,7 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  * Checking for inference and using rdf2html to print the required model to response output.
                  */
                 if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
-                    rdf2html(getCBD(model.getResource(baseURIPath), model.getDeductionsModel()), response);
+                    rdf2html(getCBD(model.getResource(baseURIPath), model), response);
                 else
                     rdf2html(getCBD(model.getResource(baseURIPath), model.getRawModel()), response);
             } else {
@@ -1112,14 +1203,19 @@ public class UriqaRepoHandler extends AbstractLifeCycle implements Serializable
                  * Checking for inference and using getCBD() and contentLengthPrint() to print the required output to
                  * response OutStream
                  */
+                // TODO So found out that normal model itself is inferenced!!. no need to call explicitly
+                // TODO Check if everything is raw model or is deductions model and accordingly check!!
                 if (paramMap.get(UriqaConstants.Parameters.INFERENCE).equals(UriqaConstants.Values.INC))
                     contentLengthPrint(response, Model.class.getMethod("write", new Class[] {OutputStream.class,
                     String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT),
-                    getCBD(model.getResource(baseURIPath), model.getDeductionsModel())}, null);
+                    getCBD(model.getResource(baseURIPath), model)}, null);
                 else
                     contentLengthPrint(response, Model.class.getMethod("write", new Class[] {OutputStream.class,
                     String.class}), new Object[] {paramMap.get(UriqaConstants.Parameters.FORMAT),
                     getCBD(model.getResource(baseURIPath), model.getRawModel())}, null);
+                // getCBD(model.getResource(baseURIPath), model.getRawModel()).write
+                // TODO writeAll ??
+                // TODO Check source code of Model.write and understand what they do...
             }
         } finally {
             model.leaveCriticalSection();
